@@ -1,14 +1,14 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
-import io
 
-# --- Tus columnas en inglés según tu Excel ---
-MINUTOS_COL = "Minutes Played"
-ALTURA_COL = "Height"
-EDAD_COL = "Age"
+# --- Mapeo de columnas ---
+column_map = {
+    'Minutos jugados': 'Minutes played',
+    'Altura': 'Height',
+    'Edad': 'Age'
+}
 
-# --- Tus roles y métricas ---
+# --- Roles y métricas ---
 roles_metrics = {
     "Box Crashers": {
         "Metrics": ["xG per 90", "xA","Successful dribbles, %","Dribbles per 90", "Touches in box per 90", "Progressive runs per 90"],
@@ -35,7 +35,7 @@ roles_metrics = {
         "Metrics": ["Passes per 90", "Accurate passes, %", "Defensive duels won, %", "Successful defensive actions per 90", "PAdj Interceptions", "Progressive passes per 90"],
         "Weights": [0.3, 0.25, 0.15, 0.1, 0.15, 0.05]
     },
-    "Possession Enabler": {
+      "Possession Enabler": {
         "Metrics": ["Short / medium passes per 90", "Accurate short / medium passes, %","Accurate forward passes, %","Passes per 90", "Accurate through passes, %"],
         "Weights": [0.3, 0.25, 0.15, 0.15, 0.15]
     },
@@ -65,79 +65,123 @@ roles_metrics = {
         "Metrics": ["Shot assists per 90", "Key passes per 90", "Smart passes per 90", "Offensive duels won, %", "Successful dribbles, %", "xA", "Non-penalty goals per 90", "xG per 90"],
         "Weights": [0.2, 0.15, 0.15, 0.15, 0.1, 0.1, 0.1, 0.05]
     },
-    "Wide CAM": {
+        "Wide CAM": {
         "Metrics": ["Shot assists per 90", "xA", "Successful dribbles, %", "Crosses per 90", "Deep completed crosses per 90", "Accelerations per 90", "Touches in box per 90"],
         "Weights": [0.1, 0.1, 0.2, 0.2, 0.2, 0.15, 0.05]
     }
 }
 
-@st.cache_data
-def load_data(file):
-    df = pd.read_excel(file)
+# --- Funciones ---
+def filter_players(df, filter_params):
+    for column, value in filter_params.items():
+        if column in df.columns:
+            if isinstance(value, tuple):
+                min_value, max_value = value
+                df = df[(df[column] >= min_value) & (df[column] <= max_value)]
+            else:
+                df = df[df[column] == value]
     return df
 
-def normalize_column(df, col):
-    min_val, max_val = df[col].min(), df[col].max()
-    if max_val > min_val:
-        return (df[col] - min_val) / (max_val - min_val) * 100
-    else:
-        return 0
+def calculate_score(df, role):
+    metrics = roles_metrics[role]["Metrics"]
+    weights = roles_metrics[role]["Weights"]
 
-def calculate_all_roles(df):
-    norm_cache = {}
-    for role, data in roles_metrics.items():
+    df = df.copy()
+    df["Puntaje"] = 0.0
+    for metric, weight in zip(metrics, weights):
+        if metric in df.columns:
+            min_val, max_val = df[metric].min(), df[metric].max()
+            if max_val > min_val:
+                df[metric] = (df[metric] - min_val) / (max_val - min_val) * 100
+            df["Puntaje"] += df[metric] * weight
+
+    df["Puntaje Normalizado"] = (df["Puntaje"] - df["Puntaje"].min()) / (df["Puntaje"].max() - df["Puntaje"].min()) * 100
+
+    return df[["Player", "Team", "Position", "Puntaje", "Puntaje Normalizado"]].sort_values(by="Puntaje", ascending=False)
+
+def calculate_roles(df):
+    df = df.copy()
+    for role in roles_metrics.keys():
         df[role] = 0.0
-        for metric, weight in zip(data["Metrics"], data["Weights"]):
+        metrics = roles_metrics[role]["Metrics"]
+        weights = roles_metrics[role]["Weights"]
+
+        for metric, weight in zip(metrics, weights):
             if metric in df.columns:
-                if metric not in norm_cache:
-                    norm_cache[metric] = normalize_column(df, metric)
-                df[role] += norm_cache[metric] * weight
+                min_val, max_val = df[metric].min(), df[metric].max()
+                if max_val > min_val:
+                    df[metric] = (df[metric] - min_val) / (max_val - min_val) * 100
+                df[role] += df[metric] * weight
 
     for role in roles_metrics.keys():
-        df[f"{role} Normalizado"] = normalize_column(df, role)
+        df[f"{role} Normalized"] = (df[role] - df[role].min()) / (df[role].max() - df[role].min()) * 100
 
-    return df
+    def best_role(row):
+        first_group = sorted(list(roles_metrics.keys())[:6], key=lambda role: row[f"{role} Normalized"], reverse=True)[0]
+        second_group = sorted(list(roles_metrics.keys())[6:], key=lambda role: row[f"{role} Normalized"], reverse=True)[0]
+        return f"{first_group} + {second_group}"
 
-def filter_players(df, minutos, altura, edad):
-    df = df[(df[MINUTOS_COL] >= minutos[0]) & (df[MINUTOS_COL] <= minutos[1])]
-    df = df[(df[ALTURA_COL] >= altura[0]) & (df[ALTURA_COL] <= altura[1])]
-    df = df[(df[EDAD_COL] >= edad[0]) & (df[EDAD_COL] <= edad[1])]
-    return df
+    df["Best Role Combined"] = df.apply(best_role, axis=1)
 
-def to_excel(df):
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df.to_excel(writer, index=False)
-    processed_data = output.getvalue()
-    return processed_data
+    columns_to_keep = ["Player", "Team", "Position", "Best Role Combined"] + [f"{role} Normalized" for role in roles_metrics.keys()]
+    return df[columns_to_keep]
 
-st.title("Scouting Roles - Visualización completa y ordenable")
+# --- Streamlit App ---
+st.title("Filtro y Puntajes de Jugadores")
 
-uploaded_file = st.file_uploader("Sube tu archivo Excel (.xlsx)", type=["xlsx"])
+uploaded_file = st.file_uploader("Sube tu archivo Excel", type=["xlsx"])
 
 if uploaded_file is not None:
-    df = load_data(uploaded_file)
+    df_raw = pd.read_excel(uploaded_file)
+
+    # Renombrar columnas
+    df_raw = df_raw.rename(columns={v: k for k, v in column_map.items()})
 
     st.write("Datos cargados:")
-    st.dataframe(df.head())
+    st.dataframe(df_raw.head())
 
-    st.sidebar.header("Filtros")
-    minutos = st.sidebar.slider("Minutos jugados", int(df[MINUTOS_COL].min()), int(df[MINUTOS_COL].max()), (int(df[MINUTOS_COL].min()), int(df[MINUTOS_COL].max())))
-    altura = st.sidebar.slider("Altura", int(df[ALTURA_COL].min()), int(df[ALTURA_COL].max()), (int(df[ALTURA_COL].min()), int(df[ALTURA_COL].max())))
-    edad = st.sidebar.slider("Edad", int(df[EDAD_COL].min()), int(df[EDAD_COL].max()), (int(df[EDAD_COL].min()), int(df[EDAD_COL].max())))
+    # Sliders para filtro
+    minutos_min, minutos_max = int(df_raw['Minutos jugados'].min()), int(df_raw['Minutos jugados'].max())
+    altura_min, altura_max = max(0, int(df_raw['Altura'].min())), int(df_raw['Altura'].max())
+    edad_min, edad_max = int(df_raw['Edad'].min()), int(df_raw['Edad'].max())
 
-    df_filtered = filter_players(df, minutos, altura, edad)
-    df_filtered = calculate_all_roles(df_filtered)
+    minutos = st.slider("Minutos jugados", min_value=minutos_min, max_value=minutos_max, value=(minutos_min, minutos_max))
+    altura = st.slider("Altura (cm)", min_value=altura_min, max_value=altura_max, value=(altura_min, altura_max))
+    edad = st.slider("Edad", min_value=edad_min, max_value=edad_max, value=(edad_min, edad_max))
 
-    role_cols = [f"{role} Normalizado" for role in roles_metrics.keys()]
+    role = st.selectbox("Selecciona un rol", list(roles_metrics.keys()))
 
-    display_cols = ['Player', 'Team', 'Position'] + role_cols
+    if st.button("Filtrar y Calcular Puntajes"):
+        filter_params = {
+            'Minutos jugados': minutos,
+            'Altura': altura,
+            'Edad': edad
+        }
 
-    st.subheader("Tabla de roles (ordenable por cualquiera de las columnas)")
+        df_filtered = filter_players(df_raw, filter_params)
+        if df_filtered.empty:
+            st.warning("No se encontraron jugadores con esos filtros.")
+        else:
+            df_score = calculate_score(df_filtered, role)
+            df_roles = calculate_roles(df_filtered)
+            df_final = pd.merge(df_score, df_roles, on=["Player", "Team", "Position"])
+            st.write("Jugadores filtrados con puntajes:")
+            st.dataframe(df_final.head(20))
 
-    df_show = df_filtered[display_cols].copy()
+            # Botón para exportar Excel
+            def to_excel(df):
+                import io
+                output = io.BytesIO()
+                with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                    df.to_excel(writer, index=False)
+                processed_data = output.getvalue()
+                return processed_data
 
-    st.dataframe(df_show, use_container_width=True)
+            excel_data = to_excel(df_final)
 
-    excel_data = to_excel(df_show)
-    st.download_button("Descargar Excel con todos los roles", data=excel_data, file_name="roles_puntajes.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            st.download_button(
+                label="Exportar a Excel",
+                data=excel_data,
+                file_name="jugadores_puntajes.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
