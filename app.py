@@ -127,15 +127,18 @@ def calculate_roles(df):
     for role in roles_metrics.keys():
         df[f"{role} Normalized"] = normalize_series(df[role])
 
+    # Elegir el rol con mayor puntaje normalizado
     def best_role(row):
-        first_group = sorted(list(roles_metrics.keys())[:6], key=lambda role: row[f"{role} Normalized"], reverse=True)[0]
-        second_group = sorted(list(roles_metrics.keys())[6:], key=lambda role: row[f"{role} Normalized"], reverse=True)[0]
-        return f"{first_group} + {second_group}"
+        roles_norm_cols = [f"{role} Normalized" for role in roles_metrics.keys()]
+        best_idx = row[roles_norm_cols].idxmax()
+        # Quitar " Normalized" del nombre de la columna para mostrar solo el rol
+        return best_idx.replace(" Normalized", "")
 
-    df["Best Role Combined"] = df.apply(best_role, axis=1)
+    df["Best Role"] = df.apply(best_role, axis=1)
 
-    columns_to_keep = ["Player", "Team", "Position", "Best Role Combined"] + [f"{role} Normalized" for role in roles_metrics.keys()]
+    columns_to_keep = ["Player", "Team", "Position", "Best Role"] + [f"{role} Normalized" for role in roles_metrics.keys()]
     return df[columns_to_keep]
+
 
 # --- Streamlit App ---
 st.title("Análisis de Jugadores y Roles")
