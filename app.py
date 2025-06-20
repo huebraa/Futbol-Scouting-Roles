@@ -198,7 +198,7 @@ role_descriptions = {
 }
 
 # Supongamos que el usuario selecciona el rol
-selected_role = st.selectbox("Selecciona un perfil de rol", list(role_descriptions.keys()))
+selected_role = st.selectbox("DESCRIPCIÓN DE ROLES - Selecciona un perfil de rol", list(role_descriptions.keys()))
 
 # Mostrar nombre, descripción y número
 if selected_role in role_descriptions:
