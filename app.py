@@ -298,3 +298,59 @@ with tab3:
 
     else:
         st.info("Por favor, sube el archivo de defensas centrales desde la barra lateral.")
+
+
+tab4 = st.tabs(["Radar Defensas Centrales"])
+
+with tab4:
+    if uploaded_file_cbs is not None:
+        df_radar_cbs = pd.read_excel(uploaded_file_cbs)
+        df_radar_cbs = df_radar_cbs.rename(columns={v: k for k, v in column_map.items()})
+
+        # Normalizamos las métricas para todos los roles de centrales
+        for r in roles_metrics_cbs.keys():
+            for metric in roles_metrics_cbs[r]["Metrics"]:
+                if metric in df_radar_cbs.columns:
+                    norm_col = metric + " Normalized"
+                    df_radar_cbs[norm_col] = normalize_series(df_radar_cbs[metric])
+
+        selected_player_cbs = st.selectbox("Selecciona un defensa central", df_radar_cbs["Player"].unique())
+        selected_role_cbs = st.selectbox("Selecciona un rol para el radar (Defensas Centrales)", list(roles_metrics_cbs.keys()))
+
+        player_radar_row_cbs = df_radar_cbs[df_radar_cbs["Player"] == selected_player_cbs]
+
+        if not player_radar_row_cbs.empty:
+            player_radar_row_cbs = player_radar_row_cbs.iloc[0]
+            metrics_cbs = roles_metrics_cbs[selected_role_cbs]["Metrics"]
+            values_cbs = []
+            labels_cbs = []
+            for metric in metrics_cbs:
+                norm_col = metric + " Normalized"
+                if norm_col in player_radar_row_cbs:
+                    values_cbs.append(player_radar_row_cbs[norm_col])
+                    labels_cbs.append(metric)
+
+            if values_cbs:
+                values_cbs += [values_cbs[0]]
+                labels_cbs += [labels_cbs[0]]
+
+                fig_cbs = go.Figure(go.Scatterpolar(
+                    r=values_cbs,
+                    theta=labels_cbs,
+                    fill='toself',
+                    name=selected_player_cbs
+                ))
+
+                fig_cbs.update_layout(
+                    polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
+                    showlegend=False,
+                    title=f"Radar de {selected_player_cbs} - Rol: {selected_role_cbs}"
+                )
+                st.plotly_chart(fig_cbs, use_container_width=True)
+            else:
+                st.warning("No hay métricas disponibles para este jugador y rol.")
+        else:
+            st.warning("Jugador no encontrado en los datos.")
+    else:
+        st.info("Por favor, sube el archivo de defensas centrales para usar el radar.")
+
