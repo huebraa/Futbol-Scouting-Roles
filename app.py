@@ -135,20 +135,27 @@ def normalize_series(series):
     else:
         return series * 0 + 50
 
-def calculate_score(df, roles_metrics, role):
-    metrics = roles_metrics[role]["Metrics"]
-    weights = roles_metrics[role]["Weights"]
-
+def calculate_all_scores(df, roles_metrics):
     df = df.copy()
-    df["Puntaje"] = 0.0
-    for metric, weight in zip(metrics, weights):
-        if metric in df.columns:
-            df[metric + " Normalized"] = normalize_series(df[metric])
-            df["Puntaje"] += df[metric + " Normalized"] * weight
+    for role, data in roles_metrics.items():
+        metrics = data["Metrics"]
+        weights = data["Weights"]
+        # inicializamos columna con 0
+        df[role + " Puntaje"] = 0
+        for metric, weight in zip(metrics, weights):
+            if metric in df.columns:
+                norm_col = metric + " Normalized"
+                # normalizamos si no existe la columna normalizada
+                if norm_col not in df.columns:
+                    df[norm_col] = normalize_series(df[metric])
+                df[role + " Puntaje"] += df[norm_col] * weight
 
-    df["Puntaje Normalizado"] = normalize_series(df["Puntaje"])
+        # Normalizamos el puntaje del rol
+        df[role + " Puntaje Normalizado"] = normalize_series(df[role + " Puntaje"])
+    # Devolvemos solo algunas columnas relevantes, por ejemplo jugador, equipo, posición y puntajes normalizados de cada rol
+    cols_to_show = ["Player", "Team", "Position"] + [role + " Puntaje Normalizado" for role in roles_metrics.keys()]
+    return df[cols_to_show].sort_values(by=list(cols_to_show[-len(roles_metrics):]), ascending=False)
 
-    return df[["Player", "Team", "Position", "Puntaje", "Puntaje Normalizado"]].sort_values(by="Puntaje", ascending=False)
 
 def show_role_descriptions(role_desc_dict):
     df_roles = pd.DataFrame.from_dict(role_desc_dict, orient='index')
@@ -197,8 +204,9 @@ with tab1:
             if df_filtered.empty:
                 st.warning("No se encontraron jugadores con esos filtros.")
             else:
-                df_score = calculate_score(df_filtered, roles_metrics_mid, role_for_score)
-                st.dataframe(df_score, use_container_width=True)
+                df_score_all = calculate_all_scores(df_filtered, roles_metrics_mid)
+                st.dataframe(df_score_all, use_container_width=True)
+
     else:
         st.info("Por favor, sube el archivo de mediocampistas desde la barra lateral.")
 
