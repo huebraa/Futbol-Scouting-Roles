@@ -43,7 +43,7 @@ roles_metrics_mid = {
 
 # --- Roles y métricas defensas centrales ---
 roles_metrics_cbs = {
-      "Ball playing CB": {
+    "Ball playing CB": {
         "Metrics": ["Accurate long passes, %", "Passes to final third per 90", "Deep completions per 90", "Progressive passes per 90",
                     "Passes per 90", "Aerial duels won, %", "Defensive duels won, %"],
         "Weights": [0.15, 0.2, 0.075, 0.15, 0.325, 0.05, 0.05]
@@ -58,7 +58,6 @@ roles_metrics_cbs = {
                     "Accurate short / medium passes, %", "Accurate long passes, %"],
         "Weights": [0.125, 0.275, 0.2, 0.2, 0.15, 0.05]
     }
-
 }
 
 def filter_players(df, filter_params):
