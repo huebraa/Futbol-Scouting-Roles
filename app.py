@@ -60,8 +60,8 @@ roles_metrics_cbs = {
     }
 }
 
-# --- Descripciones de roles mediocampistas ---
-role_descriptions = {
+# --- Diccionario mediocampistas ---
+role_descriptions_mid = {
     "Box Crashers": {
         "Nombre": "Interior Llegador",
         "Descripción": "Mediocampista con alta capacidad de irrumpir en el área rival. Aporta en generación ofensiva, conducción y finalización.",
@@ -99,7 +99,25 @@ role_descriptions = {
     }
 }
 
-# Funciones
+# --- Diccionario defensas centrales ---
+role_descriptions_cbs = {
+    "Ball playing CB": {
+        "Nombre": "Central con salida",
+        "Descripción": "Defensa central con capacidad para iniciar juego con pases largos y precisión en distribución.",
+        "Posición": "2 / 3"
+    },
+    "Defensive CB": {
+        "Nombre": "Central Defensivo",
+        "Descripción": "Enfocado en la defensa pura, gana duelos y protege el área principalmente.",
+        "Posición": "2 / 3"
+    },
+    "Wide CB": {
+        "Nombre": "Central abierto",
+        "Descripción": "Suele posicionarse más abierto, aporta en progresión y salida de balón.",
+        "Posición": "2 / 3"
+    }
+}
+
 def filter_players(df, filter_params):
     for column, value in filter_params.items():
         if column in df.columns:
@@ -117,49 +135,32 @@ def normalize_series(series):
     else:
         return series * 0 + 50
 
-def calculate_score(df, roles_metrics, role):
-    metrics = roles_metrics[role]["Metrics"]
-    weights = roles_metrics[role]["Weights"]
-
-    df = df.copy()
-    df["Puntaje"] = 0.0
-    for metric, weight in zip(metrics, weights):
-        if metric in df.columns:
-            df[metric + " Normalized"] = normalize_series(df[metric])
-            df["Puntaje"] += df[metric + " Normalized"] * weight
-
-    df["Puntaje Normalizado"] = normalize_series(df["Puntaje"])
-
-    return df
-
 def calculate_all_scores(df, roles_metrics):
-    dfs = []
-    for role in roles_metrics.keys():
-        df_role = calculate_score(df, roles_metrics, role)
-        df_role = df_role[["Player", "Team", "Position", "Puntaje Normalizado"]].rename(columns={"Puntaje Normalizado": role})
-        dfs.append(df_role.set_index("Player"))
-    df_all = pd.concat(dfs, axis=1).reset_index()
-    return df_all
+    df = df.copy()
+    for role, data in roles_metrics.items():
+        metrics = data["Metrics"]
+        weights = data["Weights"]
+        # inicializamos columna con 0
+        df[role + " Puntaje"] = 0
+        for metric, weight in zip(metrics, weights):
+            if metric in df.columns:
+                norm_col = metric + " Normalized"
+                # normalizamos si no existe la columna normalizada
+                if norm_col not in df.columns:
+                    df[norm_col] = normalize_series(df[metric])
+                df[role + " Puntaje"] += df[norm_col] * weight
 
-def style_scores(df):
-    def color_scale(val):
-        try:
-            val = float(val)
-        except (ValueError, TypeError):
-            return ''
-        if pd.isna(val):
-            return ''
-        green = int(255 * (val / 100))
-        red = 255 - green
-        return f'background-color: rgb({red}, {green}, 0)'
+        # Normalizamos el puntaje del rol
+        df[role + " Puntaje Normalizado"] = normalize_series(df[role + " Puntaje"])
+    # Devolvemos solo algunas columnas relevantes, por ejemplo jugador, equipo, posición y puntajes normalizados de cada rol
+    cols_to_show = ["Player", "Team", "Position"] + [role + " Puntaje Normalizado" for role in roles_metrics.keys()]
+    return df[cols_to_show].sort_values(by=list(cols_to_show[-len(roles_metrics):]), ascending=False)
 
-    color_cols = ["Puntaje", "Puntaje Normalizado"]
-    # Asegurarse que estas columnas están en df
-    color_cols = [col for col in color_cols if col in df.columns]
 
-    return df.style.applymap(color_scale, subset=color_cols)
-
-st.dataframe(style_scores(df_all_scores), use_container_width=True)
+def show_role_descriptions(role_desc_dict):
+    df_roles = pd.DataFrame.from_dict(role_desc_dict, orient='index')
+    df_roles.index.name = 'Rol'
+    st.table(df_roles)
 
 # --- Streamlit App ---
 
@@ -172,7 +173,7 @@ uploaded_file_cbs = st.sidebar.file_uploader("Sube archivo defensas centrales", 
 
 tab1, tab2, tab3 = st.tabs(["Mediocampistas", "Radar Mediocampistas", "Defensas Centrales"])
 
-# Mediocampistas
+# --- Mediocampistas ---
 with tab1:
     if uploaded_file_mid is not None:
         df_mid = pd.read_excel(uploaded_file_mid)
@@ -198,17 +199,24 @@ with tab1:
             if df_filtered.empty:
                 st.warning("No se encontraron jugadores con esos filtros.")
             else:
-                df_all_scores = calculate_all_scores(df_filtered, roles_metrics_mid)
-                st.dataframe(style_scores(df_all_scores), use_container_width=True)
+                # Calculamos scores para todos los roles y unimos resultados
+                all_scores = []
+                for role in roles_metrics_mid.keys():
+                    df_score = calculate_score(df_filtered, roles_metrics_mid, role)
+                    df_score = df_score.rename(columns={"Puntaje Normalizado": f"Puntaje Normalizado - {role}"})
+                    all_scores.append(df_score.set_index(["Player", "Team", "Position"]))
 
-        st.subheader("Descripción de Roles Mediocampistas")
-        for role, desc in role_descriptions.items():
-            st.markdown(f"**{desc['Nombre']} ({role.strip()}):** {desc['Descripción']} — *Posición típica: {desc['Posición']}*")
+                df_all_scores = pd.concat(all_scores, axis=1).reset_index()
 
+                # Aplicamos estilo de color a todas las columnas de puntaje normalizado
+                puntaje_cols = [col for col in df_all_scores.columns if "Puntaje Normalizado" in col]
+                styled_df = df_all_scores.style.background_gradient(subset=puntaje_cols, cmap='YlGnBu').highlight_max(subset=puntaje_cols, color='lightgreen')
+
+                st.dataframe(styled_df, use_container_width=True)
     else:
         st.info("Por favor, sube el archivo de mediocampistas desde la barra lateral.")
 
-# Radar Mediocampistas
+# --- Radar Mediocampistas ---
 with tab2:
     if uploaded_file_mid is not None:
         df_radar = pd.read_excel(uploaded_file_mid)
@@ -248,19 +256,24 @@ with tab2:
                 ))
 
                 fig.update_layout(
-                    polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
-                    showlegend=False,
-                    title=f"Radar de {selected_player} - Rol: {selected_role}"
+                    polar=dict(
+                        radialaxis=dict(
+                            visible=True,
+                            range=[0, 100]
+                        )
+                    ),
+                    showlegend=True,
+                    title=f"Radar de habilidades para {selected_player} - {selected_role}"
                 )
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig)
             else:
                 st.warning("No hay métricas disponibles para este jugador y rol.")
         else:
-            st.warning("Jugador no encontrado en los datos.")
+            st.warning("Jugador no encontrado en datos.")
     else:
-        st.info("Por favor, sube el archivo de mediocampistas desde la barra lateral para usar el radar.")
+        st.info("Por favor, sube el archivo de mediocampistas para ver el radar.")
 
-# Defensas Centrales
+# --- Defensas Centrales ---
 with tab3:
     if uploaded_file_cbs is not None:
         df_cbs = pd.read_excel(uploaded_file_cbs)
@@ -286,8 +299,19 @@ with tab3:
             if df_filtered_cbs.empty:
                 st.warning("No se encontraron jugadores con esos filtros.")
             else:
-                df_all_scores_cbs = calculate_all_scores(df_filtered_cbs, roles_metrics_cbs)
-                st.dataframe(style_scores(df_all_scores_cbs), use_container_width=True)
+                # Calculamos scores para todos los roles y unimos resultados
+                all_scores_cbs = []
+                for role in roles_metrics_cbs.keys():
+                    df_score_cbs = calculate_score(df_filtered_cbs, roles_metrics_cbs, role)
+                    df_score_cbs = df_score_cbs.rename(columns={"Puntaje Normalizado": f"Puntaje Normalizado - {role}"})
+                    all_scores_cbs.append(df_score_cbs.set_index(["Player", "Team", "Position"]))
 
+                df_all_scores_cbs = pd.concat(all_scores_cbs, axis=1).reset_index()
+
+                # Aplicamos estilo de color a todas las columnas de puntaje normalizado
+                puntaje_cols_cbs = [col for col in df_all_scores_cbs.columns if "Puntaje Normalizado" in col]
+                styled_df_cbs = df_all_scores_cbs.style.background_gradient(subset=puntaje_cols_cbs, cmap='YlGnBu').highlight_max(subset=puntaje_cols_cbs, color='lightgreen')
+
+                st.dataframe(styled_df_cbs, use_container_width=True)
     else:
         st.info("Por favor, sube el archivo de defensas centrales desde la barra lateral.")
