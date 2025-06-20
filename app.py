@@ -354,7 +354,6 @@ with tab4:
 
 # --- Extremos - Filtrado y puntajes ---
 with tab5:
-    uploaded_file_wingers = st.sidebar.file_uploader("Sube archivo extremos", type=["xlsx"], key="wingers")
     if uploaded_file_wingers is not None:
         df_wingers = pd.read_excel(uploaded_file_wingers)
         df_wingers = df_wingers.rename(columns={v: k for k, v in column_map.items()})
@@ -367,12 +366,6 @@ with tab5:
         minutos_w = st.slider("Minutos jugados", min_value=minutos_min_w, max_value=minutos_max_w, value=(minutos_min_w, minutos_max_w))
         altura_w = st.slider("Altura (cm)", min_value=altura_min_w, max_value=altura_max_w, value=(altura_min_w, altura_max_w))
         edad_w = st.slider("Edad", min_value=edad_min_w, max_value=edad_max_w, value=(edad_min_w, edad_max_w))
-
-        st.subheader("Roles y Descripciones")
-        for role, desc in role_descriptions_wingers.items():
-            st.markdown(f"**{desc['Nombre']} ({role})**")
-            st.markdown(f"Posición típica: {desc['Posición']}")
-            st.markdown(f"{desc['Descripción']}\n")
 
         if st.button("Filtrar y Calcular Puntajes (Extremos)"):
             filter_params_w = {
@@ -387,7 +380,7 @@ with tab5:
                 df_score_w = calculate_score_all_roles(df_filtered_w, roles_metrics_wingers)
                 st.dataframe(df_score_w, use_container_width=True)
     else:
-        st.info("Por favor, sube el archivo de extremos desde la barra lateral.")
+        st.info("Por favor, sube el archivo de extremos desde la barra lateral.").")
 
 # --- Radar Extremos ---
 with tab6:
