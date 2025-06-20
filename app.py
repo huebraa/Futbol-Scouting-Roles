@@ -60,6 +60,41 @@ roles_metrics_cbs = {
     }
 }
 
+# --- Roles y métricas extremos ---
+roles_metrics_wingers = {
+    "Inverted Winger": {
+        "Metrics": ["Successful dribbles, %", "Dribbles per 90", "xA", "Key passes per 90", "Shots per 90", "Progressive runs per 90"],
+        "Weights": [0.2, 0.2, 0.2, 0.15, 0.15, 0.1]
+    },
+    "Traditional Winger": {
+        "Metrics": ["Successful crosses, %", "Crosses per 90", "Touches in box per 90", "Progressive runs per 90", "Successful dribbles, %", "xG per 90"],
+        "Weights": [0.25, 0.2, 0.2, 0.15, 0.1, 0.1]
+    },
+    "Wide Forward": {
+        "Metrics": ["Shots per 90", "xG per 90", "xA", "Key passes per 90", "Dribbles per 90", "Touches in box per 90"],
+        "Weights": [0.3, 0.25, 0.15, 0.15, 0.1, 0.05]
+    }
+}
+
+# --- Diccionario con nombres, descripción y posición típica para extremos ---
+role_descriptions_wingers = {
+    "Inverted Winger": {
+        "Nombre": "Extremo Interior",
+        "Descripción": "Extremo que tiende a cortar hacia dentro para buscar disparo o pase decisivo.",
+        "Posición": "7 / 11"
+    },
+    "Traditional Winger": {
+        "Nombre": "Extremo Tradicional",
+        "Descripción": "Extremo abierto que centra al área, genera ocasiones con centros y desborde.",
+        "Posición": "7 / 11"
+    },
+    "Wide Forward": {
+        "Nombre": "Delantero por Banda",
+        "Descripción": "Atacante que juega pegado a la banda, con foco en remates y presencia en área.",
+        "Posición": "7 / 9 / 11"
+    }
+}
+
 # --- Diccionario con nombres, descripción y número típico de posición ---
 role_descriptions = {
     "Box Crashers": {
@@ -317,10 +352,9 @@ with tab4:
     else:
         st.info("Por favor, sube el archivo de defensas centrales desde la barra lateral para usar el radar.")
 
-
+# --- Extremos - Filtrado y puntajes ---
 with tab5:
     uploaded_file_wingers = st.sidebar.file_uploader("Sube archivo extremos", type=["xlsx"], key="wingers")
-
     if uploaded_file_wingers is not None:
         df_wingers = pd.read_excel(uploaded_file_wingers)
         df_wingers = df_wingers.rename(columns={v: k for k, v in column_map.items()})
@@ -334,8 +368,7 @@ with tab5:
         altura_w = st.slider("Altura (cm)", min_value=altura_min_w, max_value=altura_max_w, value=(altura_min_w, altura_max_w))
         edad_w = st.slider("Edad", min_value=edad_min_w, max_value=edad_max_w, value=(edad_min_w, edad_max_w))
 
-        # Mostrar descripciones de roles extremos
-        st.subheader("Roles y Descripciones - Extremos")
+        st.subheader("Roles y Descripciones")
         for role, desc in role_descriptions_wingers.items():
             st.markdown(f"**{desc['Nombre']} ({role})**")
             st.markdown(f"Posición típica: {desc['Posición']}")
@@ -354,8 +387,9 @@ with tab5:
                 df_score_w = calculate_score_all_roles(df_filtered_w, roles_metrics_wingers)
                 st.dataframe(df_score_w, use_container_width=True)
     else:
-        st.info("Por favor, sube el archivo de extremos desde la barra lateral para analizar.")
+        st.info("Por favor, sube el archivo de extremos desde la barra lateral.")
 
+# --- Radar Extremos ---
 with tab6:
     if uploaded_file_wingers is not None:
         df_radar_w = pd.read_excel(uploaded_file_wingers)
@@ -384,7 +418,7 @@ with tab6:
                     labels_w.append(metric)
 
             if values_w:
-                values_w += [values_w[0]]
+                values_w += [values_w[0]]  # cerrar círculo
                 labels_w += [labels_w[0]]
 
                 fig_w = go.Figure(go.Scatterpolar(
@@ -401,9 +435,8 @@ with tab6:
                 )
                 st.plotly_chart(fig_w, use_container_width=True)
             else:
-                st.warning("No hay métricas disponibles para este extremo y rol.")
+                st.warning("No hay métricas disponibles para este jugador y rol.")
         else:
-            st.warning("Extremo no encontrado en los datos.")
+            st.warning("Jugador no encontrado en los datos.")
     else:
         st.info("Por favor, sube el archivo de extremos desde la barra lateral para usar el radar.")
-
