@@ -60,41 +60,6 @@ roles_metrics_cbs = {
     }
 }
 
-# --- Roles y métricas extremos ---
-roles_metrics_wingers = {
-    "Inverted Winger": {
-        "Metrics": ["Successful dribbles, %", "Dribbles per 90", "xA", "Key passes per 90", "Shots per 90", "Progressive runs per 90"],
-        "Weights": [0.2, 0.2, 0.2, 0.15, 0.15, 0.1]
-    },
-    "Traditional Winger": {
-        "Metrics": ["Successful crosses, %", "Crosses per 90", "Touches in box per 90", "Progressive runs per 90", "Successful dribbles, %", "xG per 90"],
-        "Weights": [0.25, 0.2, 0.2, 0.15, 0.1, 0.1]
-    },
-    "Wide Forward": {
-        "Metrics": ["Shots per 90", "xG per 90", "xA", "Key passes per 90", "Dribbles per 90", "Touches in box per 90"],
-        "Weights": [0.3, 0.25, 0.15, 0.15, 0.1, 0.05]
-    }
-}
-
-# --- Diccionario con nombres, descripción y posición típica para extremos ---
-role_descriptions_wingers = {
-    "Inverted Winger": {
-        "Nombre": "Extremo Interior",
-        "Descripción": "Extremo que tiende a cortar hacia dentro para buscar disparo o pase decisivo.",
-        "Posición": "7 / 11"
-    },
-    "Traditional Winger": {
-        "Nombre": "Extremo Tradicional",
-        "Descripción": "Extremo abierto que centra al área, genera ocasiones con centros y desborde.",
-        "Posición": "7 / 11"
-    },
-    "Wide Forward": {
-        "Nombre": "Delantero por Banda",
-        "Descripción": "Atacante que juega pegado a la banda, con foco en remates y presencia en área.",
-        "Posición": "7 / 9 / 11"
-    }
-}
-
 # --- Diccionario con nombres, descripción y número típico de posición ---
 role_descriptions = {
     "Box Crashers": {
@@ -179,7 +144,7 @@ st.sidebar.header("Carga de datos")
 uploaded_file_mid = st.sidebar.file_uploader("Sube archivo mediocampistas", type=["xlsx"], key="mid")
 uploaded_file_cbs = st.sidebar.file_uploader("Sube archivo defensas centrales", type=["xlsx"], key="cbs")
 
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Mediocampistas", "Radar Mediocampistas", "Defensas Centrales", "Radar Defensas Centrales", "Extremos", "Radar Extremos"])
+tab1, tab2, tab3, tab4 = st.tabs(["Mediocampistas", "Radar Mediocampistas", "Defensas Centrales", "Radar Defensas Centrales"])
 
 # --- Mediocampistas ---
 with tab1:
@@ -351,85 +316,3 @@ with tab4:
             st.warning("Jugador no encontrado en los datos.")
     else:
         st.info("Por favor, sube el archivo de defensas centrales desde la barra lateral para usar el radar.")
-
-# --- Extremos - Filtrado y puntajes ---
-with tab5:
-    if uploaded_file_wingers is not None:
-        df_wingers = pd.read_excel(uploaded_file_wingers)
-        df_wingers = df_wingers.rename(columns={v: k for k, v in column_map.items()})
-
-        minutos_min_w, minutos_max_w = int(df_wingers['Minutos jugados'].min()), int(df_wingers['Minutos jugados'].max())
-        altura_min_w, altura_max_w = max(0, int(df_wingers['Altura'].min())), int(df_wingers['Altura'].max())
-        edad_min_w, edad_max_w = int(df_wingers['Edad'].min()), int(df_wingers['Edad'].max())
-
-        st.header("Filtrar y visualizar tabla - Extremos")
-        minutos_w = st.slider("Minutos jugados", min_value=minutos_min_w, max_value=minutos_max_w, value=(minutos_min_w, minutos_max_w))
-        altura_w = st.slider("Altura (cm)", min_value=altura_min_w, max_value=altura_max_w, value=(altura_min_w, altura_max_w))
-        edad_w = st.slider("Edad", min_value=edad_min_w, max_value=edad_max_w, value=(edad_min_w, edad_max_w))
-
-        if st.button("Filtrar y Calcular Puntajes (Extremos)"):
-            filter_params_w = {
-                'Minutos jugados': minutos_w,
-                'Altura': altura_w,
-                'Edad': edad_w
-            }
-            df_filtered_w = filter_players(df_wingers, filter_params_w)
-            if df_filtered_w.empty:
-                st.warning("No se encontraron extremos con esos filtros.")
-            else:
-                df_score_w = calculate_score_all_roles(df_filtered_w, roles_metrics_wingers)
-                st.dataframe(df_score_w, use_container_width=True)
-    else:
-        st.info("Por favor, sube el archivo de extremos desde la barra lateral.").")
-
-# --- Radar Extremos ---
-with tab6:
-    if uploaded_file_wingers is not None:
-        df_radar_w = pd.read_excel(uploaded_file_wingers)
-        df_radar_w = df_radar_w.rename(columns={v: k for k, v in column_map.items()})
-
-        for r in roles_metrics_wingers.keys():
-            for metric in roles_metrics_wingers[r]["Metrics"]:
-                if metric in df_radar_w.columns:
-                    norm_col = metric + " Normalized"
-                    df_radar_w[norm_col] = normalize_series(df_radar_w[metric])
-
-        selected_player_w = st.selectbox("Selecciona un extremo", df_radar_w["Player"].unique())
-        selected_role_w = st.selectbox("Selecciona un rol para el radar (Extremos)", list(roles_metrics_wingers.keys()))
-
-        player_radar_row_w = df_radar_w[df_radar_w["Player"] == selected_player_w]
-
-        if not player_radar_row_w.empty:
-            player_radar_row_w = player_radar_row_w.iloc[0]
-            metrics_w = roles_metrics_wingers[selected_role_w]["Metrics"]
-            values_w = []
-            labels_w = []
-            for metric in metrics_w:
-                norm_col = metric + " Normalized"
-                if norm_col in player_radar_row_w:
-                    values_w.append(player_radar_row_w[norm_col])
-                    labels_w.append(metric)
-
-            if values_w:
-                values_w += [values_w[0]]  # cerrar círculo
-                labels_w += [labels_w[0]]
-
-                fig_w = go.Figure(go.Scatterpolar(
-                    r=values_w,
-                    theta=labels_w,
-                    fill='toself',
-                    name=selected_player_w
-                ))
-
-                fig_w.update_layout(
-                    polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
-                    showlegend=False,
-                    title=f"Radar de {selected_player_w} - Rol: {selected_role_w}"
-                )
-                st.plotly_chart(fig_w, use_container_width=True)
-            else:
-                st.warning("No hay métricas disponibles para este jugador y rol.")
-        else:
-            st.warning("Jugador no encontrado en los datos.")
-    else:
-        st.info("Por favor, sube el archivo de extremos desde la barra lateral para usar el radar.")
