@@ -74,8 +74,6 @@ roles_metrics = {
 @st.cache_data
 def load_data(file):
     df = pd.read_excel(file)
-    # Renombrar columnas para consistencia (si quieres)
-    # Aquí no renombramos para no romper nada, depende de tus columnas originales
     return df
 
 def normalize_column(df, col):
@@ -86,7 +84,6 @@ def normalize_column(df, col):
         return 0
 
 def calculate_all_roles(df):
-    # Para evitar repetir cálculos, vamos a crear todas las columnas normalizadas que se usan
     norm_cache = {}
     for role, data in roles_metrics.items():
         df[role] = 0.0
@@ -96,16 +93,15 @@ def calculate_all_roles(df):
                     norm_cache[metric] = normalize_column(df, metric)
                 df[role] += norm_cache[metric] * weight
 
-    # Normalizar scores de cada rol
     for role in roles_metrics.keys():
         df[f"{role} Normalizado"] = normalize_column(df, role)
 
     return df
 
 def filter_players(df, minutos, altura, edad):
-    df = df[(df['Minutos jugados'] >= minutos[0]) & (df['Minutos jugados'] <= minutos[1])]
-    df = df[(df['Altura'] >= altura[0]) & (df['Altura'] <= altura[1])]
-    df = df[(df['Edad'] >= edad[0]) & (df['Edad'] <= edad[1])]
+    df = df[(df[MINUTOS_COL] >= minutos[0]) & (df[MINUTOS_COL] <= minutos[1])]
+    df = df[(df[ALTURA_COL] >= altura[0]) & (df[ALTURA_COL] <= altura[1])]
+    df = df[(df[EDAD_COL] >= edad[0]) & (df[EDAD_COL] <= edad[1])]
     return df
 
 def to_excel(df):
@@ -122,31 +118,26 @@ uploaded_file = st.file_uploader("Sube tu archivo Excel (.xlsx)", type=["xlsx"])
 if uploaded_file is not None:
     df = load_data(uploaded_file)
 
-    # Mostrar primeras filas
     st.write("Datos cargados:")
     st.dataframe(df.head())
 
-    # Filtros
     st.sidebar.header("Filtros")
-    minutos = st.sidebar.slider("Minutos jugados", int(df['Minutos jugados'].min()), int(df['Minutos jugados'].max()), (int(df['Minutos jugados'].min()), int(df['Minutos jugados'].max())))
-    altura = st.sidebar.slider("Altura", int(df['Altura'].min()), int(df['Altura'].max()), (int(df['Altura'].min()), int(df['Altura'].max())))
-    edad = st.sidebar.slider("Edad", int(df['Edad'].min()), int(df['Edad'].max()), (int(df['Edad'].min()), int(df['Edad'].max())))
+    minutos = st.sidebar.slider("Minutos jugados", int(df[MINUTOS_COL].min()), int(df[MINUTOS_COL].max()), (int(df[MINUTOS_COL].min()), int(df[MINUTOS_COL].max())))
+    altura = st.sidebar.slider("Altura", int(df[ALTURA_COL].min()), int(df[ALTURA_COL].max()), (int(df[ALTURA_COL].min()), int(df[ALTURA_COL].max())))
+    edad = st.sidebar.slider("Edad", int(df[EDAD_COL].min()), int(df[EDAD_COL].max()), (int(df[EDAD_COL].min()), int(df[EDAD_COL].max())))
 
     df_filtered = filter_players(df, minutos, altura, edad)
     df_filtered = calculate_all_roles(df_filtered)
 
-    # Columnas de puntajes normalizados para mostrar y ordenar
     role_cols = [f"{role} Normalizado" for role in roles_metrics.keys()]
 
-    # DataFrame para mostrar
     display_cols = ['Player', 'Team', 'Position'] + role_cols
 
     st.subheader("Tabla de roles (ordenable por cualquiera de las columnas)")
 
     df_show = df_filtered[display_cols].copy()
 
-    st.dataframe(df_show, use_container_width=True)  # Streamlit permite ordenar al hacer clic en encabezados
+    st.dataframe(df_show, use_container_width=True)
 
-    # Descargar Excel
     excel_data = to_excel(df_show)
     st.download_button("Descargar Excel con todos los roles", data=excel_data, file_name="roles_puntajes.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
