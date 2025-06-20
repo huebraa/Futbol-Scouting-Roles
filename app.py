@@ -173,41 +173,43 @@ if uploaded_file is not None:
         role_for_score = st.selectbox("Selecciona un rol para calcular puntajes", list(roles_metrics.keys()))
 
         if st.button("Filtrar y Calcular Puntajes"):
-            with st.spinner("Procesando datos, por favor espera..."):
-                filter_params = {
-                    'Minutos jugados': minutos,
-                    'Altura': altura,
-                    'Edad': edad
-                }
-        
-                df_filtered = filter_players(df_raw, filter_params)
-                if df_filtered.empty:
-                    st.warning("No se encontraron jugadores con esos filtros.")
-                else:
-                    df_score = calculate_score(df_filtered, role)
-                    df_roles = calculate_roles(df_filtered)
-                    df_final = pd.merge(df_score, df_roles, on=["Player", "Team", "Position"])
-                    st.write("Jugadores filtrados con puntajes:")
-                    st.dataframe(df_final.head(20))
-        
-                    # Botón para exportar Excel
-                    def to_excel(df):
-                        import io
-                        output = io.BytesIO()
-                        with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                            df.to_excel(writer, index=False)
-                        processed_data = output.getvalue()
-                        return processed_data
-        
-                    excel_data = to_excel(df_final)
-        
-                    st.download_button(
-                        label="Exportar a Excel",
-                        data=excel_data,
-                        file_name="jugadores_puntajes.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    )
+            filter_params = {
+                'Minutos jugados': minutos,
+                'Altura': altura,
+                'Edad': edad
+            }
 
+            df_filtered = filter_players(df_raw, filter_params)
+            if df_filtered.empty:
+                st.warning("No se encontraron jugadores con esos filtros.")
+            else:
+                df_score = calculate_score(df_filtered, role_for_score)
+                df_roles = calculate_roles(df_filtered)
+                df_final = pd.merge(df_score, df_roles, on=["Player", "Team", "Position"])
+
+                styled_df = df_final.style.background_gradient(
+                    subset=["Puntaje", "Puntaje Normalizado"] + [f"{r} Normalized" for r in roles_metrics.keys()],
+                    cmap='RdYlGn'
+                )
+
+                st.dataframe(styled_df, use_container_width=True)
+
+                def to_excel(df):
+                    import io
+                    output = io.BytesIO()
+                    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                        df.to_excel(writer, index=False)
+                    processed_data = output.getvalue()
+                    return processed_data
+
+                excel_data = to_excel(df_final)
+
+                st.download_button(
+                    label="Exportar a Excel",
+                    data=excel_data,
+                    file_name="jugadores_puntajes.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
 
     with tab2:
         st.header("Radar por Jugador y Rol")
