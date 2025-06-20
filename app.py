@@ -273,32 +273,28 @@ with tab3:
         df_cbs = pd.read_excel(uploaded_file_cbs)
         df_cbs = df_cbs.rename(columns={v: k for k, v in column_map.items()})
 
-        minutos_min_cbs, minutos_max_cbs = int(df_cbs['Minutos jugados'].min()), int(df_cbs['Minutos jugados'].max())
-        altura_min_cbs, altura_max_cbs = max(0, int(df_cbs['Altura'].min())), int(df_cbs['Altura'].max())
-        edad_min_cbs, edad_max_cbs = int(df_cbs['Edad'].min()), int(df_cbs['Edad'].max())
-
-        st.header("Roles disponibles y sus descripciones")
-        show_role_descriptions(role_descriptions_cbs)
+        minutos_min, minutos_max = int(df_cbs['Minutos jugados'].min()), int(df_cbs['Minutos jugados'].max())
+        altura_min, altura_max = max(0, int(df_cbs['Altura'].min())), int(df_cbs['Altura'].max())
+        edad_min, edad_max = int(df_cbs['Edad'].min()), int(df_cbs['Edad'].max())
 
         st.header("Filtrar y visualizar tabla - Defensas Centrales")
-        minutos_cbs = st.slider("Minutos jugados", min_value=minutos_min_cbs, max_value=minutos_max_cbs, value=(minutos_min_cbs, minutos_max_cbs), key="minutos_cbs")
-        altura_cbs = st.slider("Altura (cm)", min_value=altura_min_cbs, max_value=altura_max_cbs, value=(altura_min_cbs, altura_max_cbs), key="altura_cbs")
-        edad_cbs = st.slider("Edad", min_value=edad_min_cbs, max_value=edad_max_cbs, value=(edad_min_cbs, edad_max_cbs), key="edad_cbs")
-
-        role_for_score_cbs = st.selectbox("Selecciona un rol para calcular puntajes", list(roles_metrics_cbs.keys()), key="cb_role")
+        minutos = st.slider("Minutos jugados", min_value=minutos_min, max_value=minutos_max, value=(minutos_min, minutos_max), key="cb_minutos")
+        altura = st.slider("Altura (cm)", min_value=altura_min, max_value=altura_max, value=(altura_min, altura_max), key="cb_altura")
+        edad = st.slider("Edad", min_value=edad_min, max_value=edad_max, value=(edad_min, edad_max), key="cb_edad")
 
         if st.button("Filtrar y Calcular Puntajes (Defensas Centrales)"):
-            filter_params_cbs = {
-                'Minutos jugados': minutos_cbs,
-                'Altura': altura_cbs,
-                'Edad': edad_cbs
+            filter_params = {
+                'Minutos jugados': minutos,
+                'Altura': altura,
+                'Edad': edad
             }
 
-            df_filtered_cbs = filter_players(df_cbs, filter_params_cbs)
+            df_filtered_cbs = filter_players(df_cbs, filter_params)
             if df_filtered_cbs.empty:
                 st.warning("No se encontraron jugadores con esos filtros.")
             else:
-                df_score_cbs = calculate_score(df_filtered_cbs, roles_metrics_cbs, role_for_score_cbs)
+                df_score_cbs = calculate_all_scores(df_filtered_cbs, roles_metrics_cbs)
                 st.dataframe(df_score_cbs, use_container_width=True)
+
     else:
         st.info("Por favor, sube el archivo de defensas centrales desde la barra lateral.")
