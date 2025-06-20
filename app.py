@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 
-# --- Mapeo de columnas ---
+# --- Mapeo de columnas para renombrar ---
 column_map = {
     'Minutos jugados': 'Minutes played',
     'Altura': 'Height',
