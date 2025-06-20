@@ -19,7 +19,7 @@ roles_metrics = {
                     "Long passes per 90"],
         "Weights": [0.3, 0.25, 0.2, 0.1, 0.1, 0.05]
     },
-    "Orchestrator": {
+    "Orchestrator ": {
         "Metrics": ["Passes per 90", "Accurate passes, %","Short / medium passes per 90", "PAdj Interceptions", "Successful defensive actions per 90", "Key passes per 90", "Defensive duels won, %"],
         "Weights": [0.25, 0.2, 0.15, 0.15, 0.1, 0.1, 0.05]
     },
@@ -34,40 +34,12 @@ roles_metrics = {
     "Builder": {
         "Metrics": ["Passes per 90", "Accurate passes, %", "Defensive duels won, %", "Successful defensive actions per 90", "PAdj Interceptions", "Progressive passes per 90"],
         "Weights": [0.3, 0.25, 0.15, 0.1, 0.15, 0.05]
-    },
-      "Possession Enabler": {
-        "Metrics": ["Short / medium passes per 90", "Accurate short / medium passes, %","Accurate forward passes, %","Passes per 90", "Accurate through passes, %"],
-        "Weights": [0.3, 0.25, 0.15, 0.15, 0.15]
+
     },
     "Defensive Mid": {
         "Metrics": ["Defensive duels won, %", "Aerial duels won, %", "PAdj Sliding tackles", "PAdj Interceptions",
                     "Successful defensive actions per 90"],
         "Weights": [0.4, 0.1, 0.2, 0.2, 0.1]
-    },
-    "Number 6": {
-        "Metrics": ["Defensive duels won, %", "Accurate short / medium passes, %","Short / medium passes per 90", "Offensive duels won, %"  ],
-        "Weights": [0.3, 0.25, 0.225, 0.225]
-    },
-    "Deep-Lying Playmaker": {
-        "Metrics": ["Passes to final third per 90", "Deep completions per 90", "Progressive passes per 90", "Shot assists per 90","xA", "Second assists per 90", "Third assists per 90",
-                    "Defensive duels won, %","Key passes per 90"],
-        "Weights": [0.125, 0.125, 0.25, 0.15, 0.05, 0.05, 0.05, 0.1, 0.1]
-    },
-    "Progressive Midfielder": {
-        "Metrics": ["Progressive runs per 90", "Progressive passes per 90", "Passes to final third per 90", "Received passes per 90", "Offensive duels won, %", "Accelerations per 90"],
-        "Weights": [0.225, 0.225, 0.2, 0.15, 0.1, 0.1]
-    },
-    "Box-to-Box Midfielder": {
-        "Metrics": ["Defensive duels won, %", "Offensive duels won, %", "Progressive runs per 90", "Passes to final third per 90", "PAdj Sliding tackles", "PAdj Interceptions"],
-        "Weights": [0.275, 0.275, 0.25, 0.1, 0.05, 0.05]
-    },
-    "Advanced Playmaker": {
-        "Metrics": ["Shot assists per 90", "Key passes per 90", "Smart passes per 90", "Offensive duels won, %", "Successful dribbles, %", "xA", "Non-penalty goals per 90", "xG per 90"],
-        "Weights": [0.2, 0.15, 0.15, 0.15, 0.1, 0.1, 0.1, 0.05]
-    },
-        "Wide CAM": {
-        "Metrics": ["Shot assists per 90", "xA", "Successful dribbles, %", "Crosses per 90", "Deep completed crosses per 90", "Accelerations per 90", "Touches in box per 90"],
-        "Weights": [0.1, 0.1, 0.2, 0.2, 0.2, 0.15, 0.05]
     }
 }
 
@@ -185,3 +157,53 @@ if uploaded_file is not None:
                 file_name="jugadores_puntajes.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
+
+# Diccionario con nombres, descripción y número típico de posición
+role_descriptions = {
+    "Box Crashers": {
+        "Nombre": "Interior Llegador",
+        "Descripción": "Mediocampista con alta capacidad de irrumpir en el área rival. Aporta en generación ofensiva, conducción y finalización.",
+        "Posición": "8 / 10"
+    },
+    "Creator": {
+        "Nombre": "Creador de Juego",
+        "Descripción": "Centrado en generar ocasiones de gol desde zonas avanzadas. Preciso en pases clave, visión ofensiva.",
+        "Posición": "10 / 8"
+    },
+    "Orchestrator ": {
+        "Nombre": "Organizador de Medio Campo",
+        "Descripción": "Controla el ritmo del partido. Distribuye el balón con precisión y colabora en tareas defensivas.",
+        "Posición": "6 / 8"
+    },
+    "Box to Box": {
+        "Nombre": "Volante Mixto",
+        "Descripción": "Participa tanto en defensa como en ataque. Recorre grandes distancias y tiene impacto en ambas áreas.",
+        "Posición": "8"
+    },
+    "Distributor": {
+        "Nombre": "Distribuidor de Juego",
+        "Descripción": "Especialista en circulación y distribución. Preciso en pases hacia el frente y cambios de orientación.",
+        "Posición": "6 / 8"
+    },
+    "Builder": {
+        "Nombre": "Constructor desde Atrás",
+        "Descripción": "Inicia la jugada desde zonas más retrasadas. Seguro con el balón y fuerte en tareas defensivas básicas.",
+        "Posición": "5 / 6"
+    },
+    "Defensive Mid": {
+        "Nombre": "Mediocentro Defensivo",
+        "Descripción": "Recuperador puro. Interrumpe el juego rival y protege la zona delante de la defensa.",
+        "Posición": "6"
+    }
+}
+
+# Supongamos que el usuario selecciona el rol
+selected_role = st.selectbox("Selecciona un perfil de rol", list(role_descriptions.keys()))
+
+# Mostrar nombre, descripción y número
+if selected_role in role_descriptions:
+    info = role_descriptions[selected_role]
+    st.markdown(f"### 🧩 Perfil: **{info['Nombre']}**")
+    st.markdown(f"**Descripción:** {info['Descripción']}")
+    st.markdown(f"**Posición típica:** `{info['Posición']}`")
+
