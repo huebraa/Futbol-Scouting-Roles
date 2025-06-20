@@ -60,7 +60,7 @@ roles_metrics_cbs = {
     }
 }
 
-# --- Descripciones de roles ---
+# --- Diccionario con nombres, descripción y número típico de posición ---
 role_descriptions = {
     "Box Crashers": {
         "Nombre": "Interior Llegador",
@@ -99,8 +99,6 @@ role_descriptions = {
     }
 }
 
-# --- Funciones auxiliares ---
-
 def filter_players(df, filter_params):
     for column, value in filter_params.items():
         if column in df.columns:
@@ -119,36 +117,23 @@ def normalize_series(series):
         return series * 0 + 50
 
 def calculate_score_all_roles(df, roles_metrics):
-    # Calcula el puntaje para todos los roles y concatena resultados
-    results = []
-    for role, data in roles_metrics.items():
-        metrics = data["Metrics"]
-        weights = data["Weights"]
-        df_temp = df.copy()
-        df_temp["Puntaje"] = 0.0
+    df = df.copy()
+    df_scores = []
+    for role in roles_metrics.keys():
+        metrics = roles_metrics[role]["Metrics"]
+        weights = roles_metrics[role]["Weights"]
+        df["Puntaje_" + role] = 0.0
         for metric, weight in zip(metrics, weights):
-            if metric in df_temp.columns:
-                df_temp[metric + " Normalized"] = normalize_series(df_temp[metric])
-                df_temp["Puntaje"] += df_temp[metric + " Normalized"] * weight
-        df_temp["Puntaje Normalizado"] = normalize_series(df_temp["Puntaje"])
-        df_temp = df_temp[["Player", "Team", "Position", "Puntaje", "Puntaje Normalizado"]]
-        df_temp["Rol"] = role
-        results.append(df_temp)
-    df_scores = pd.concat(results).sort_values(by=["Rol", "Puntaje"], ascending=[True, False])
-    return df_scores
+            if metric in df.columns:
+                norm_col = metric + " Normalized"
+                df[norm_col] = normalize_series(df[metric])
+                df["Puntaje_" + role] += df[norm_col] * weight
 
-def style_scores(df):
-    if "Puntaje Normalizado" in df.columns:
-        try:
-            return df.style.background_gradient(subset=["Puntaje Normalizado"], cmap="Greens") \
-                           .format({"Puntaje": "{:.2f}", "Puntaje Normalizado": "{:.2f}"})
-        except KeyError as e:
-            st.error(f"Error al aplicar estilo: {e}")
-            return df.style.format({"Puntaje": "{:.2f}"})
-    else:
-        return df.style.format({"Puntaje": "{:.2f}"})
-
-
+        df["Puntaje Normalizado_" + role] = normalize_series(df["Puntaje_" + role])
+        df_scores.append(df[["Player", "Team", "Position", "Puntaje_" + role, "Puntaje Normalizado_" + role]].rename(
+            columns={"Puntaje_" + role: "Puntaje", "Puntaje Normalizado_" + role: "Puntaje Normalizado"}).assign(Rol=role))
+    df_final = pd.concat(df_scores).sort_values(by=["Rol", "Puntaje"], ascending=[True, False])
+    return df_final
 
 # --- Streamlit App ---
 
@@ -159,7 +144,7 @@ st.sidebar.header("Carga de datos")
 uploaded_file_mid = st.sidebar.file_uploader("Sube archivo mediocampistas", type=["xlsx"], key="mid")
 uploaded_file_cbs = st.sidebar.file_uploader("Sube archivo defensas centrales", type=["xlsx"], key="cbs")
 
-tab1, tab2, tab3, tab4 = st.tabs(["Mediocampistas", "Radar Mediocampistas", "Defensas Centrales", "Radar Defensas"])
+tab1, tab2, tab3, tab4 = st.tabs(["Mediocampistas", "Radar Mediocampistas", "Defensas Centrales", "Radar Defensas Centrales"])
 
 # --- Mediocampistas ---
 with tab1:
@@ -176,6 +161,13 @@ with tab1:
         altura = st.slider("Altura (cm)", min_value=altura_min, max_value=altura_max, value=(altura_min, altura_max))
         edad = st.slider("Edad", min_value=edad_min, max_value=edad_max, value=(edad_min, edad_max))
 
+        # Mostrar descripciones de roles
+        st.subheader("Roles y Descripciones")
+        for role, desc in role_descriptions.items():
+            st.markdown(f"**{desc['Nombre']} ({role})**")
+            st.markdown(f"Posición típica: {desc['Posición']}")
+            st.markdown(f"{desc['Descripción']}\n")
+
         if st.button("Filtrar y Calcular Puntajes (Mediocampistas)"):
             filter_params = {
                 'Minutos jugados': minutos,
@@ -186,16 +178,8 @@ with tab1:
             if df_filtered.empty:
                 st.warning("No se encontraron jugadores con esos filtros.")
             else:
-                df_scores = calculate_score_all_roles(df_filtered, roles_metrics_mid)
-                st.dataframe(style_scores(df_scores), use_container_width=True)
-                
-                # Mostrar descripción de roles
-                st.subheader("Descripción de Roles (Mediocampistas)")
-                for role, info in role_descriptions.items():
-                    st.markdown(f"**{role} - {info['Nombre']}**  ")
-                    st.markdown(f"Posición típica: {info['Posición']}  ")
-                    st.markdown(f"{info['Descripción']}  ")
-                    st.markdown("---")
+                df_score = calculate_score_all_roles(df_filtered, roles_metrics_mid)
+                st.dataframe(df_score, use_container_width=True)
     else:
         st.info("Por favor, sube el archivo de mediocampistas desde la barra lateral.")
 
@@ -257,33 +241,27 @@ with tab3:
         df_cbs = pd.read_excel(uploaded_file_cbs)
         df_cbs = df_cbs.rename(columns={v: k for k, v in column_map.items()})
 
-        minutos_min, minutos_max = int(df_cbs['Minutos jugados'].min()), int(df_cbs['Minutos jugados'].max())
-        altura_min, altura_max = max(0, int(df_cbs['Altura'].min())), int(df_cbs['Altura'].max())
-        edad_min, edad_max = int(df_cbs['Edad'].min()), int(df_cbs['Edad'].max())
+        minutos_min_cbs, minutos_max_cbs = int(df_cbs['Minutos jugados'].min()), int(df_cbs['Minutos jugados'].max())
+        altura_min_cbs, altura_max_cbs = max(0, int(df_cbs['Altura'].min())), int(df_cbs['Altura'].max())
+        edad_min_cbs, edad_max_cbs = int(df_cbs['Edad'].min()), int(df_cbs['Edad'].max())
 
         st.header("Filtrar y visualizar tabla - Defensas Centrales")
-        minutos = st.slider("Minutos jugados", min_value=minutos_min, max_value=minutos_max, value=(minutos_min, minutos_max), key="cb_minutos")
-        altura = st.slider("Altura (cm)", min_value=altura_min, max_value=altura_max, value=(altura_min, altura_max), key="cb_altura")
-        edad = st.slider("Edad", min_value=edad_min, max_value=edad_max, value=(edad_min, edad_max), key="cb_edad")
+        minutos_cbs = st.slider("Minutos jugados", min_value=minutos_min_cbs, max_value=minutos_max_cbs, value=(minutos_min_cbs, minutos_max_cbs))
+        altura_cbs = st.slider("Altura (cm)", min_value=altura_min_cbs, max_value=altura_max_cbs, value=(altura_min_cbs, altura_max_cbs))
+        edad_cbs = st.slider("Edad", min_value=edad_min_cbs, max_value=edad_max_cbs, value=(edad_min_cbs, edad_max_cbs))
 
         if st.button("Filtrar y Calcular Puntajes (Defensas Centrales)"):
-            filter_params = {
-                'Minutos jugados': minutos,
-                'Altura': altura,
-                'Edad': edad
+            filter_params_cbs = {
+                'Minutos jugados': minutos_cbs,
+                'Altura': altura_cbs,
+                'Edad': edad_cbs
             }
-            df_filtered_cbs = filter_players(df_cbs, filter_params)
+            df_filtered_cbs = filter_players(df_cbs, filter_params_cbs)
             if df_filtered_cbs.empty:
-                st.warning("No se encontraron jugadores con esos filtros.")
+                st.warning("No se encontraron defensas centrales con esos filtros.")
             else:
-                df_scores_cbs = calculate_score_all_roles(df_filtered_cbs, roles_metrics_cbs)
-                st.dataframe(style_scores(df_scores_cbs), use_container_width=True)
-
-                # Mostrar descripciones de roles centrales (creo que tienes menos descripciones para estos)
-                st.subheader("Descripción de Roles (Defensas Centrales)")
-                for role in roles_metrics_cbs.keys():
-                    st.markdown(f"**{role}**")
-                    st.markdown("---")
+                df_score_cbs = calculate_score_all_roles(df_filtered_cbs, roles_metrics_cbs)
+                st.dataframe(df_score_cbs, use_container_width=True)
     else:
         st.info("Por favor, sube el archivo de defensas centrales desde la barra lateral.")
 
@@ -300,7 +278,7 @@ with tab4:
                     df_radar_cbs[norm_col] = normalize_series(df_radar_cbs[metric])
 
         selected_player_cbs = st.selectbox("Selecciona un defensa central", df_radar_cbs["Player"].unique())
-        selected_role_cbs = st.selectbox("Selecciona un rol para el radar (CB)", list(roles_metrics_cbs.keys()))
+        selected_role_cbs = st.selectbox("Selecciona un rol para el radar (Defensas Centrales)", list(roles_metrics_cbs.keys()))
 
         player_radar_row_cbs = df_radar_cbs[df_radar_cbs["Player"] == selected_player_cbs]
 
@@ -316,7 +294,7 @@ with tab4:
                     labels_cbs.append(metric)
 
             if values_cbs:
-                values_cbs += [values_cbs[0]]
+                values_cbs += [values_cbs[0]]  # cerrar el círculo
                 labels_cbs += [labels_cbs[0]]
 
                 fig_cbs = go.Figure(go.Scatterpolar(
