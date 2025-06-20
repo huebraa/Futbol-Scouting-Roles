@@ -116,24 +116,24 @@ def normalize_series(series):
     else:
         return series * 0 + 50
 
-def calculate_score_all_roles(df, roles_metrics):
+def calculate_score_all_roles_wide(df, roles_metrics):
     df = df.copy()
-    df_scores = []
+    df_final = df[['Player', 'Team', 'Position']].drop_duplicates().reset_index(drop=True)
+    
     for role in roles_metrics.keys():
         metrics = roles_metrics[role]["Metrics"]
         weights = roles_metrics[role]["Weights"]
-        df["Puntaje_" + role] = 0.0
+        puntaje = pd.Series(0.0, index=df.index)
         for metric, weight in zip(metrics, weights):
             if metric in df.columns:
-                norm_col = metric + " Normalized"
-                df[norm_col] = normalize_series(df[metric])
-                df["Puntaje_" + role] += df[norm_col] * weight
+                norm_metric = normalize_series(df[metric])
+                puntaje += norm_metric * weight
+        # Normalizamos puntaje final para el rol
+        puntaje_norm = normalize_series(puntaje)
+        df_final["Puntaje_" + role.strip()] = puntaje_norm.values
 
-        df["Puntaje Normalizado_" + role] = normalize_series(df["Puntaje_" + role])
-        df_scores.append(df[["Player", "Team", "Position", "Puntaje_" + role, "Puntaje Normalizado_" + role]].rename(
-            columns={"Puntaje_" + role: "Puntaje", "Puntaje Normalizado_" + role: "Puntaje Normalizado"}).assign(Rol=role))
-    df_final = pd.concat(df_scores).sort_values(by=["Rol", "Puntaje"], ascending=[True, False])
     return df_final
+
 
 # --- Streamlit App ---
 
