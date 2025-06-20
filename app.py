@@ -159,6 +159,71 @@ if uploaded_file is not None:
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
 
+import plotly.graph_objects as go
+
+if not df_final.empty:
+    # Tomamos el mejor jugador según Puntaje Normalizado del rol seleccionado
+    best_player = df_final.iloc[0]
+
+    st.markdown(f"## 🏆 Mejor jugador: {best_player['Player']} ({best_player['Team']})")
+
+    # Radar plot de las métricas del rol
+    metrics = roles_metrics[role]["Metrics"]
+    player_row = df_filtered[df_filtered["Player"] == best_player["Player"]].iloc[0]
+
+    # Normalizar valores de métricas para radar (0-100 escala relativa)
+    metric_values = []
+    for metric in metrics:
+        if metric in df_filtered.columns:
+            min_val, max_val = df_filtered[metric].min(), df_filtered[metric].max()
+            val = player_row[metric]
+            if max_val > min_val:
+                norm_val = (val - min_val) / (max_val - min_val) * 100
+            else:
+                norm_val = 0
+            metric_values.append(norm_val)
+        else:
+            metric_values.append(0)
+
+    # Cerrar el radar (primer valor al final)
+    metric_values += metric_values[:1]
+    metrics_radar = metrics + [metrics[0]]
+
+    fig = go.Figure(
+        data=go.Scatterpolar(
+            r=metric_values,
+            theta=metrics_radar,
+            fill='toself',
+            name=best_player['Player']
+        )
+    )
+
+    fig.update_layout(
+        polar=dict(
+            radialaxis=dict(
+                visible=True,
+                range=[0, 100]
+            )
+        ),
+        showlegend=False,
+        title=f"Métricas normalizadas de {best_player['Player']} para rol {role}"
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+    # Mostrar tabla coloreada con pandas Styler
+    def color_map(val):
+        # Gradiente de verde a blanco para puntajes
+        color = f'background-color: rgba(0, 255, 0, {val/100})'
+        return color
+
+    # Aplica color solo a columnas de puntajes normalizados
+    puntajes_cols = [col for col in df_final.columns if "Normalized" in col]
+    st.markdown("### Tabla de puntajes con mapa de colores")
+    styled_df = df_final.style.background_gradient(subset=puntajes_cols, cmap='Greens')
+    st.dataframe(styled_df, use_container_width=True)
+
+
 # Diccionario con nombres, descripción y número típico de posición
 role_descriptions = {
     "Box Crashers": {
