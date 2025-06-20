@@ -164,7 +164,7 @@ st.sidebar.header("Carga de datos")
 
 uploaded_file_mid = st.sidebar.file_uploader("Sube archivo mediocampistas", type=["xlsx"], key="mid")
 uploaded_file_cbs = st.sidebar.file_uploader("Sube archivo defensas centrales", type=["xlsx"], key="cbs")
-uploaded_file_ext = st.sidebar.file_uploader("Sube archivo extremos", type=["xlsx"], key="ext")
+
 
 tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Mediocampistas", "Radar Mediocampistas", "Defensas Centrales", "Radar Defensas Centrales", "Extremos", "Radar Extremos"])
 
