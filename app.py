@@ -1,6 +1,6 @@
-
 import streamlit as st
 import pandas as pd
+import plotly.graph_objects as go
 
 # --- Mapeo de columnas ---
 column_map = {
@@ -99,131 +99,6 @@ def calculate_roles(df):
     columns_to_keep = ["Player", "Team", "Position", "Best Role Combined"] + [f"{role} Normalized" for role in roles_metrics.keys()]
     return df[columns_to_keep]
 
-# --- Streamlit App ---
-st.title("Filtro y Puntajes de Jugadores")
-
-uploaded_file = st.file_uploader("Sube tu archivo Excel", type=["xlsx"])
-
-if uploaded_file is not None:
-    df_raw = pd.read_excel(uploaded_file)
-
-    # Renombrar columnas
-    df_raw = df_raw.rename(columns={v: k for k, v in column_map.items()})
-
-    st.write("Datos cargados:")
-    st.dataframe(df_raw.head())
-
-    # Sliders para filtro
-    minutos_min, minutos_max = int(df_raw['Minutos jugados'].min()), int(df_raw['Minutos jugados'].max())
-    altura_min, altura_max = max(0, int(df_raw['Altura'].min())), int(df_raw['Altura'].max())
-    edad_min, edad_max = int(df_raw['Edad'].min()), int(df_raw['Edad'].max())
-
-    minutos = st.slider("Minutos jugados", min_value=minutos_min, max_value=minutos_max, value=(minutos_min, minutos_max))
-    altura = st.slider("Altura (cm)", min_value=altura_min, max_value=altura_max, value=(altura_min, altura_max))
-    edad = st.slider("Edad", min_value=edad_min, max_value=edad_max, value=(edad_min, edad_max))
-
-    role = st.selectbox("Selecciona un rol", list(roles_metrics.keys()))
-
-    if st.button("Filtrar y Calcular Puntajes"):
-        filter_params = {
-            'Minutos jugados': minutos,
-            'Altura': altura,
-            'Edad': edad
-        }
-
-        df_filtered = filter_players(df_raw, filter_params)
-        if df_filtered.empty:
-            st.warning("No se encontraron jugadores con esos filtros.")
-        else:
-            df_score = calculate_score(df_filtered, role)
-            df_roles = calculate_roles(df_filtered)
-            df_final = pd.merge(df_score, df_roles, on=["Player", "Team", "Position"])
-            st.write("Jugadores filtrados con puntajes:")
-            st.dataframe(df_final.head(20))
-
-            # Botón para exportar Excel
-            def to_excel(df):
-                import io
-                output = io.BytesIO()
-                with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                    df.to_excel(writer, index=False)
-                processed_data = output.getvalue()
-                return processed_data
-
-            excel_data = to_excel(df_final)
-
-            st.download_button(
-                label="Exportar a Excel",
-                data=excel_data,
-                file_name="jugadores_puntajes.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
-
-import plotly.graph_objects as go
-
-if not df_final.empty:
-    # Tomamos el mejor jugador según Puntaje Normalizado del rol seleccionado
-    best_player = df_final.iloc[0]
-
-    st.markdown(f"## 🏆 Mejor jugador: {best_player['Player']} ({best_player['Team']})")
-
-    # Radar plot de las métricas del rol
-    metrics = roles_metrics[role]["Metrics"]
-    player_row = df_filtered[df_filtered["Player"] == best_player["Player"]].iloc[0]
-
-    # Normalizar valores de métricas para radar (0-100 escala relativa)
-    metric_values = []
-    for metric in metrics:
-        if metric in df_filtered.columns:
-            min_val, max_val = df_filtered[metric].min(), df_filtered[metric].max()
-            val = player_row[metric]
-            if max_val > min_val:
-                norm_val = (val - min_val) / (max_val - min_val) * 100
-            else:
-                norm_val = 0
-            metric_values.append(norm_val)
-        else:
-            metric_values.append(0)
-
-    # Cerrar el radar (primer valor al final)
-    metric_values += metric_values[:1]
-    metrics_radar = metrics + [metrics[0]]
-
-    fig = go.Figure(
-        data=go.Scatterpolar(
-            r=metric_values,
-            theta=metrics_radar,
-            fill='toself',
-            name=best_player['Player']
-        )
-    )
-
-    fig.update_layout(
-        polar=dict(
-            radialaxis=dict(
-                visible=True,
-                range=[0, 100]
-            )
-        ),
-        showlegend=False,
-        title=f"Métricas normalizadas de {best_player['Player']} para rol {role}"
-    )
-
-    st.plotly_chart(fig, use_container_width=True)
-
-    # Mostrar tabla coloreada con pandas Styler
-    def color_map(val):
-        # Gradiente de verde a blanco para puntajes
-        color = f'background-color: rgba(0, 255, 0, {val/100})'
-        return color
-
-    # Aplica color solo a columnas de puntajes normalizados
-    puntajes_cols = [col for col in df_final.columns if "Normalized" in col]
-    st.markdown("### Tabla de puntajes con mapa de colores")
-    styled_df = df_final.style.background_gradient(subset=puntajes_cols, cmap='Greens')
-    st.dataframe(styled_df, use_container_width=True)
-
-
 # Diccionario con nombres, descripción y número típico de posición
 role_descriptions = {
     "Box Crashers": {
@@ -263,12 +138,121 @@ role_descriptions = {
     }
 }
 
-# Supongamos que el usuario selecciona el rol
-selected_role = st.selectbox("DESCRIPCIÓN DE ROLES - Selecciona un perfil de rol", list(role_descriptions.keys()))
+# --- Streamlit App ---
+st.title("Filtro y Puntajes de Jugadores")
 
-# Mostrar nombre, descripción y número
-if selected_role in role_descriptions:
-    info = role_descriptions[selected_role]
-    st.markdown(f"### 🧩 Perfil: **{info['Nombre']}**")
-    st.markdown(f"**Descripción:** {info['Descripción']}")
-    st.markdown(f"**Posición típica:** `{info['Posición']}`")
+uploaded_file = st.file_uploader("Sube tu archivo Excel", type=["xlsx"])
+
+if uploaded_file is not None:
+    df_raw = pd.read_excel(uploaded_file)
+
+    # Renombrar columnas
+    df_raw = df_raw.rename(columns={v: k for k, v in column_map.items()})
+
+    st.write("Datos cargados:")
+    st.dataframe(df_raw.head())
+
+    # Sliders para filtro
+    minutos_min, minutos_max = int(df_raw['Minutos jugados'].min()), int(df_raw['Minutos jugados'].max())
+    altura_min, altura_max = max(0, int(df_raw['Altura'].min())), int(df_raw['Altura'].max())
+    edad_min, edad_max = int(df_raw['Edad'].min()), int(df_raw['Edad'].max())
+
+    minutos = st.slider("Minutos jugados", min_value=minutos_min, max_value=minutos_max, value=(minutos_min, minutos_max))
+    altura = st.slider("Altura (cm)", min_value=altura_min, max_value=altura_max, value=(altura_min, altura_max))
+    edad = st.slider("Edad", min_value=edad_min, max_value=edad_max, value=(edad_min, edad_max))
+
+    role = st.selectbox("Selecciona un rol", list(roles_metrics.keys()))
+
+    if st.button("Filtrar y Calcular Puntajes"):
+        filter_params = {
+            'Minutos jugados': minutos,
+            'Altura': altura,
+            'Edad': edad
+        }
+
+        df_filtered = filter_players(df_raw, filter_params)
+        if df_filtered.empty:
+            st.warning("No se encontraron jugadores con esos filtros.")
+        else:
+            df_score = calculate_score(df_filtered, role)
+            df_roles = calculate_roles(df_filtered)
+            df_final = pd.merge(df_score, df_roles, on=["Player", "Team", "Position"])
+
+            st.write("Jugadores filtrados con puntajes:")
+            
+            # Mostrar tabla coloreada con pandas Styler
+            puntajes_cols = [col for col in df_final.columns if "Normalized" in col]
+            styled_df = df_final.style.background_gradient(subset=puntajes_cols, cmap='Greens')
+            st.dataframe(styled_df, use_container_width=True)
+
+            # --- Gráfico Radar ---
+            best_player = df_final.iloc[0]
+
+            st.markdown(f"## 🏆 Mejor jugador: {best_player['Player']} ({best_player['Team']})")
+
+            metrics = roles_metrics[role]["Metrics"]
+            player_row = df_filtered[df_filtered["Player"] == best_player["Player"]].iloc[0]
+
+            metric_values = []
+            for metric in metrics:
+                if metric in df_filtered.columns:
+                    min_val, max_val = df_filtered[metric].min(), df_filtered[metric].max()
+                    val = player_row[metric]
+                    if max_val > min_val:
+                        norm_val = (val - min_val) / (max_val - min_val) * 100
+                    else:
+                        norm_val = 0
+                    metric_values.append(norm_val)
+                else:
+                    metric_values.append(0)
+
+            metric_values += metric_values[:1]
+            metrics_radar = metrics + [metrics[0]]
+
+            fig = go.Figure(
+                data=go.Scatterpolar(
+                    r=metric_values,
+                    theta=metrics_radar,
+                    fill='toself',
+                    name=best_player['Player']
+                )
+            )
+
+            fig.update_layout(
+                polar=dict(
+                    radialaxis=dict(
+                        visible=True,
+                        range=[0, 100]
+                    )
+                ),
+                showlegend=False,
+                title=f"Métricas normalizadas de {best_player['Player']} para rol {role}"
+            )
+
+            st.plotly_chart(fig, use_container_width=True)
+
+            # Botón para exportar Excel
+            def to_excel(df):
+                import io
+                output = io.BytesIO()
+                with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                    df.to_excel(writer, index=False)
+                processed_data = output.getvalue()
+                return processed_data
+
+            excel_data = to_excel(df_final)
+
+            st.download_button(
+                label="Exportar a Excel",
+                data=excel_data,
+                file_name="jugadores_puntajes.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+
+# Mostrar descripción de roles (fuera del upload)
+selected_role = st.selectbox("DESCRIPCIÓN DE ROLES (para aprender)", list(role_descriptions.keys()))
+if selected_role:
+    desc = role_descriptions[selected_role]
+    st.markdown(f"### {desc['Nombre']}")
+    st.markdown(f"**Posición típica:** {desc['Posición']}")
+    st.markdown(desc['Descripción'])
