@@ -60,114 +60,57 @@ roles_metrics_cbs = {
     }
 }
 
-# --- Diccionario mediocampistas ---
-role_descriptions_mid = {
-    "Box Crashers": {
-        "Nombre": "Interior Llegador",
-        "Descripción": "Mediocampista con alta capacidad de irrumpir en el área rival. Aporta en generación ofensiva, conducción y finalización.",
-        "Posición": "8 / 10"
-    },
-    "Creator": {
-        "Nombre": "Creador de Juego",
-        "Descripción": "Centrado en generar ocasiones de gol desde zonas avanzadas. Preciso en pases clave, visión ofensiva.",
-        "Posición": "10 / 8"
-    },
-    "Orchestrator ": {
-        "Nombre": "Organizador de Medio Campo",
-        "Descripción": "Controla el ritmo del partido. Distribuye el balón con precisión y colabora en tareas defensivas.",
-        "Posición": "6 / 8"
-    },
-    "Box to Box": {
-        "Nombre": "Volante Mixto",
-        "Descripción": "Participa tanto en defensa como en ataque. Recorre grandes distancias y tiene impacto en ambas áreas.",
-        "Posición": "8"
-    },
-    "Distributor": {
-        "Nombre": "Distribuidor de Juego",
-        "Descripción": "Especialista en circulación y distribución. Preciso en pases hacia el frente y cambios de orientación.",
-        "Posición": "6 / 8"
-    },
-    "Builder": {
-        "Nombre": "Constructor desde Atrás",
-        "Descripción": "Inicia la jugada desde zonas más retrasadas. Seguro con el balón y fuerte en tareas defensivas básicas.",
-        "Posición": "5 / 6"
-    },
-    "Defensive Mid": {
-        "Nombre": "Mediocentro Defensivo",
-        "Descripción": "Recuperador puro. Interrumpe el juego rival y protege la zona delante de la defensa.",
-        "Posición": "6"
-    }
-}
-
-# --- Diccionario defensas centrales ---
-role_descriptions_cbs = {
-    "Ball playing CB": {
-        "Nombre": "Central con salida",
-        "Descripción": "Defensa central con capacidad para iniciar juego con pases largos y precisión en distribución.",
-        "Posición": "2 / 3"
-    },
-    "Defensive CB": {
-        "Nombre": "Central Defensivo",
-        "Descripción": "Enfocado en la defensa pura, gana duelos y protege el área principalmente.",
-        "Posición": "2 / 3"
-    },
-    "Wide CB": {
-        "Nombre": "Central abierto",
-        "Descripción": "Suele posicionarse más abierto, aporta en progresión y salida de balón.",
-        "Posición": "2 / 3"
-    }
-}
-
+# --- Funciones ---
 def filter_players(df, filter_params):
     for column, value in filter_params.items():
         if column in df.columns:
             if isinstance(value, tuple):
-                min_value, max_value = value
-                df = df[(df[column] >= min_value) & (df[column] <= max_value)]
+                df = df[(df[column] >= value[0]) & (df[column] <= value[1])]
             else:
                 df = df[df[column] == value]
     return df
 
 def normalize_series(series):
-    min_val, max_val = series.min(), series.max()
-    if max_val > min_val:
-        return (series - min_val) / (max_val - min_val) * 100
-    else:
-        return series * 0 + 50
+    return (series - series.min()) / (series.max() - series.min()) * 100 if series.max() > series.min() else series * 0 + 50
 
 def calculate_all_scores(df, roles_metrics):
-    df = df.copy()
-    for role, data in roles_metrics.items():
-        metrics = data["Metrics"]
-        weights = data["Weights"]
-        # inicializamos columna con 0
-        df[role + " Puntaje"] = 0
+    all_results = []
+    for role_name, config in roles_metrics.items():
+        metrics = config["Metrics"]
+        weights = config["Weights"]
+        df_copy = df.copy()
+        df_copy["Puntaje"] = 0.0
+
         for metric, weight in zip(metrics, weights):
-            if metric in df.columns:
-                norm_col = metric + " Normalized"
-                # normalizamos si no existe la columna normalizada
-                if norm_col not in df.columns:
-                    df[norm_col] = normalize_series(df[metric])
-                df[role + " Puntaje"] += df[norm_col] * weight
+            if metric in df_copy.columns:
+                norm_col = metric + f" ({role_name})"
+                df_copy[norm_col] = normalize_series(df_copy[metric])
+                df_copy["Puntaje"] += df_copy[norm_col] * weight
 
-        # Normalizamos el puntaje del rol
-        df[role + " Puntaje Normalizado"] = normalize_series(df[role + " Puntaje"])
-    # Devolvemos solo algunas columnas relevantes, por ejemplo jugador, equipo, posición y puntajes normalizados de cada rol
-    cols_to_show = ["Player", "Team", "Position"] + [role + " Puntaje Normalizado" for role in roles_metrics.keys()]
-    return df[cols_to_show].sort_values(by=list(cols_to_show[-len(roles_metrics):]), ascending=False)
+        df_copy["Puntaje Normalizado"] = normalize_series(df_copy["Puntaje"])
+        df_copy["Rol"] = role_name
+        all_results.append(df_copy[["Player", "Team", "Position", "Puntaje", "Puntaje Normalizado", "Rol"] +
+                                   [metric + f" ({role_name})" for metric in config["Metrics"]]])
 
+    df_concat = pd.concat(all_results)
+    df_optimo = df_concat.loc[df_concat.groupby("Player")["Puntaje"].idxmax()].copy()
+    df_optimo.rename(columns={"Rol": "Rol Óptimo"}, inplace=True)
 
-def show_role_descriptions(role_desc_dict):
-    df_roles = pd.DataFrame.from_dict(role_desc_dict, orient='index')
-    df_roles.index.name = 'Rol'
-    st.table(df_roles)
+    return df_optimo.sort_values(by="Puntaje", ascending=False)
 
-# --- Streamlit App ---
+def style_score_table(df):
+    styled = df.style
+    if "Puntaje Normalizado" in df.columns:
+        styled = styled.background_gradient(subset=["Puntaje Normalizado"], cmap="Greens")
+    metric_cols = [col for col in df.columns if " (" in col and "Normalized" in col]
+    if metric_cols:
+        styled = styled.highlight_max(subset=metric_cols, color="lightblue")
+    return styled
 
+# --- App Streamlit ---
 st.title("Análisis de Jugadores y Roles")
 
 st.sidebar.header("Carga de datos")
-
 uploaded_file_mid = st.sidebar.file_uploader("Sube archivo mediocampistas", type=["xlsx"], key="mid")
 uploaded_file_cbs = st.sidebar.file_uploader("Sube archivo defensas centrales", type=["xlsx"], key="cbs")
 
@@ -175,126 +118,70 @@ tab1, tab2, tab3 = st.tabs(["Mediocampistas", "Radar Mediocampistas", "Defensas 
 
 # --- Mediocampistas ---
 with tab1:
-    if uploaded_file_mid is not None:
+    if uploaded_file_mid:
         df_mid = pd.read_excel(uploaded_file_mid)
         df_mid = df_mid.rename(columns={v: k for k, v in column_map.items()})
 
-        minutos_min, minutos_max = int(df_mid['Minutos jugados'].min()), int(df_mid['Minutos jugados'].max())
-        altura_min, altura_max = max(0, int(df_mid['Altura'].min())), int(df_mid['Altura'].max())
-        edad_min, edad_max = int(df_mid['Edad'].min()), int(df_mid['Edad'].max())
+        minutos = st.slider("Minutos jugados", int(df_mid['Minutos jugados'].min()), int(df_mid['Minutos jugados'].max()), (int(df_mid['Minutos jugados'].min()), int(df_mid['Minutos jugados'].max())))
+        altura = st.slider("Altura (cm)", int(df_mid['Altura'].min()), int(df_mid['Altura'].max()), (int(df_mid['Altura'].min()), int(df_mid['Altura'].max())))
+        edad = st.slider("Edad", int(df_mid['Edad'].min()), int(df_mid['Edad'].max()), (int(df_mid['Edad'].min()), int(df_mid['Edad'].max())))
 
-        st.header("Roles disponibles y sus descripciones")
-        show_role_descriptions(role_descriptions_mid)
+        if st.button("Filtrar y Calcular (Mediocampistas)"):
+            filtros = {'Minutos jugados': minutos, 'Altura': altura, 'Edad': edad}
+            df_filtrado = filter_players(df_mid, filtros)
 
-        st.header("Filtrar y visualizar tabla - Mediocampistas")
-        minutos = st.slider("Minutos jugados", min_value=minutos_min, max_value=minutos_max, value=(minutos_min, minutos_max))
-        altura = st.slider("Altura (cm)", min_value=altura_min, max_value=altura_max, value=(altura_min, altura_max))
-        edad = st.slider("Edad", min_value=edad_min, max_value=edad_max, value=(edad_min, edad_max))
-
-        role_for_score = st.selectbox("Selecciona un rol para calcular puntajes", list(roles_metrics_mid.keys()))
-
-        if st.button("Filtrar y Calcular Puntajes (Mediocampistas)"):
-            filter_params = {
-                'Minutos jugados': minutos,
-                'Altura': altura,
-                'Edad': edad
-            }
-
-            df_filtered = filter_players(df_mid, filter_params)
-            if df_filtered.empty:
+            if df_filtrado.empty:
                 st.warning("No se encontraron jugadores con esos filtros.")
             else:
-                df_score_all = calculate_all_scores(df_filtered, roles_metrics_mid)
-                st.dataframe(df_score_all, use_container_width=True)
-
+                df_score_all = calculate_all_scores(df_filtrado, roles_metrics_mid)
+                st.dataframe(style_score_table(df_score_all), use_container_width=True)
     else:
-        st.info("Por favor, sube el archivo de mediocampistas desde la barra lateral.")
+        st.info("Sube el archivo de mediocampistas.")
 
-# --- Radar Mediocampistas ---
+# --- Radar ---
 with tab2:
-    if uploaded_file_mid is not None:
+    if uploaded_file_mid:
         df_radar = pd.read_excel(uploaded_file_mid)
         df_radar = df_radar.rename(columns={v: k for k, v in column_map.items()})
 
-        for r in roles_metrics_mid.keys():
-            for metric in roles_metrics_mid[r]["Metrics"]:
-                if metric in df_radar.columns:
-                    norm_col = metric + " Normalized"
-                    df_radar[norm_col] = normalize_series(df_radar[metric])
+        for r in roles_metrics_mid:
+            for m in roles_metrics_mid[r]["Metrics"]:
+                if m in df_radar.columns:
+                    df_radar[m + " Normalized"] = normalize_series(df_radar[m])
 
-        selected_player = st.selectbox("Selecciona un jugador", df_radar["Player"].unique())
-        selected_role = st.selectbox("Selecciona un rol para el radar", list(roles_metrics_mid.keys()))
+        player = st.selectbox("Jugador", df_radar["Player"].unique())
+        role = st.selectbox("Rol", list(roles_metrics_mid.keys()))
 
-        player_radar_row = df_radar[df_radar["Player"] == selected_player]
+        row = df_radar[df_radar["Player"] == player].iloc[0]
+        labels = roles_metrics_mid[role]["Metrics"]
+        values = [row[m + " Normalized"] if m + " Normalized" in row else 0 for m in labels]
+        values += [values[0]]
+        labels += [labels[0]]
 
-        if not player_radar_row.empty:
-            player_radar_row = player_radar_row.iloc[0]
-            metrics = roles_metrics_mid[selected_role]["Metrics"]
-            values = []
-            labels = []
-            for metric in metrics:
-                norm_col = metric + " Normalized"
-                if norm_col in player_radar_row:
-                    values.append(player_radar_row[norm_col])
-                    labels.append(metric)
-
-            if values:
-                values += [values[0]]
-                labels += [labels[0]]
-
-                fig = go.Figure(go.Scatterpolar(
-                    r=values,
-                    theta=labels,
-                    fill='toself',
-                    name=selected_player
-                ))
-
-                fig.update_layout(
-                    polar=dict(
-                        radialaxis=dict(
-                            visible=True,
-                            range=[0, 100]
-                        )
-                    ),
-                    showlegend=True,
-                    title=f"Radar de habilidades para {selected_player} - {selected_role}"
-                )
-                st.plotly_chart(fig)
-            else:
-                st.warning("No hay métricas disponibles para este jugador y rol.")
-        else:
-            st.warning("Jugador no encontrado en datos.")
+        fig = go.Figure(go.Scatterpolar(r=values, theta=labels, fill='toself', name=player))
+        fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), showlegend=False)
+        st.plotly_chart(fig, use_container_width=True)
     else:
-        st.info("Por favor, sube el archivo de mediocampistas para ver el radar.")
+        st.info("Sube el archivo para ver el radar.")
 
 # --- Defensas Centrales ---
 with tab3:
-    if uploaded_file_cbs is not None:
+    if uploaded_file_cbs:
         df_cbs = pd.read_excel(uploaded_file_cbs)
         df_cbs = df_cbs.rename(columns={v: k for k, v in column_map.items()})
 
-        minutos_min, minutos_max = int(df_cbs['Minutos jugados'].min()), int(df_cbs['Minutos jugados'].max())
-        altura_min, altura_max = max(0, int(df_cbs['Altura'].min())), int(df_cbs['Altura'].max())
-        edad_min, edad_max = int(df_cbs['Edad'].min()), int(df_cbs['Edad'].max())
+        minutos = st.slider("Minutos jugados", int(df_cbs['Minutos jugados'].min()), int(df_cbs['Minutos jugados'].max()), (int(df_cbs['Minutos jugados'].min()), int(df_cbs['Minutos jugados'].max())), key="cb_min")
+        altura = st.slider("Altura", int(df_cbs['Altura'].min()), int(df_cbs['Altura'].max()), (int(df_cbs['Altura'].min()), int(df_cbs['Altura'].max())), key="cb_alt")
+        edad = st.slider("Edad", int(df_cbs['Edad'].min()), int(df_cbs['Edad'].max()), (int(df_cbs['Edad'].min()), int(df_cbs['Edad'].max())), key="cb_edad")
 
-        st.header("Filtrar y visualizar tabla - Defensas Centrales")
-        minutos = st.slider("Minutos jugados", min_value=minutos_min, max_value=minutos_max, value=(minutos_min, minutos_max), key="cb_minutos")
-        altura = st.slider("Altura (cm)", min_value=altura_min, max_value=altura_max, value=(altura_min, altura_max), key="cb_altura")
-        edad = st.slider("Edad", min_value=edad_min, max_value=edad_max, value=(edad_min, edad_max), key="cb_edad")
+        if st.button("Filtrar y Calcular (Centrales)"):
+            filtros = {'Minutos jugados': minutos, 'Altura': altura, 'Edad': edad}
+            df_filtrado = filter_players(df_cbs, filtros)
 
-        if st.button("Filtrar y Calcular Puntajes (Defensas Centrales)"):
-            filter_params = {
-                'Minutos jugados': minutos,
-                'Altura': altura,
-                'Edad': edad
-            }
-
-            df_filtered_cbs = filter_players(df_cbs, filter_params)
-            if df_filtered_cbs.empty:
+            if df_filtrado.empty:
                 st.warning("No se encontraron jugadores con esos filtros.")
             else:
-                df_score_cbs = calculate_all_scores(df_filtered_cbs, roles_metrics_cbs)
-                st.dataframe(df_score_cbs, use_container_width=True)
-
+                df_score_cbs_all = calculate_all_scores(df_filtrado, roles_metrics_cbs)
+                st.dataframe(style_score_table(df_score_cbs_all), use_container_width=True)
     else:
-        st.info("Por favor, sube el archivo de defensas centrales desde la barra lateral.")
+        st.info("Sube el archivo de defensas centrales.")
