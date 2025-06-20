@@ -1,2 +1,2 @@
 openpyxl
-pip install plotly
+plotly
