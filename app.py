@@ -344,11 +344,10 @@ with tab5:
         edad_min_w, edad_max_w = int(df_wingers['Edad'].min()), int(df_wingers['Edad'].max())
 
         st.header("Filtrar y visualizar tabla - Extremos")
-        minutos_w = st.slider("Minutos jugados", min_value=minutos_min_w, max_value=minutos_max_w, value=(minutos_min_w, minutos_max_w))
-        altura_w = st.slider("Altura (cm)", min_value=altura_min_w, max_value=altura_max_w, value=(altura_min_w, altura_max_w))
-        edad_w = st.slider("Edad", min_value=edad_min_w, max_value=edad_max_w, value=(edad_min_w, edad_max_w))
-
-        if st.button("Filtrar y Calcular Puntajes (Extremos)"):
+        minutos_w = st.slider("Minutos jugados", min_value=minutos_min_w, max_value=minutos_max_w, value=(minutos_min_w, minutos_max_w), key="minutos_w")
+        altura_w = st.slider("Altura (cm)", min_value=altura_min_w, max_value=altura_max_w, value=(altura_min_w, altura_max_w), key="altura_w")
+        edad_w = st.slider("Edad", min_value=edad_min_w, max_value=edad_max_w, value=(edad_min_w, edad_max_w), key="edad_w")
+        if st.button("Filtrar y Calcular Puntajes (Extremos)", key="button_extremos"):
             filter_params_w = {
                 'Minutos jugados': minutos_w,
                 'Altura': altura_w,
