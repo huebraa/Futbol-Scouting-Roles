@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
+import plotly.express as px
 
 # --- Mapeo de columnas ---
 column_map = {
@@ -183,7 +184,7 @@ with tab1:
     else:
         st.info("Por favor, sube el archivo de mediocampistas desde la barra lateral.")
 
-# --- Radar Mediocampistas (modificado) ---
+# --- Radar Mediocampistas (modificado con colores) ---
 with tab2:
     if uploaded_file_mid is not None:
         df_radar = pd.read_excel(uploaded_file_mid)
@@ -201,9 +202,12 @@ with tab2:
         if selected_players:
             metrics = roles_metrics_mid[selected_role]["Metrics"]
             labels = metrics + [metrics[0]]  # cerrar círculo
+
+            # Paleta de colores
+            colors = px.colors.qualitative.Plotly  
             fig = go.Figure()
 
-            for player in selected_players:
+            for i, player in enumerate(selected_players):
                 player_radar_row = df_radar[df_radar["Player"] == player]
                 if not player_radar_row.empty:
                     player_radar_row = player_radar_row.iloc[0]
@@ -217,7 +221,8 @@ with tab2:
                         r=values,
                         theta=labels,
                         fill='toself',
-                        name=player
+                        name=player,
+                        line_color=colors[i % len(colors)]
                     ))
 
             fig.update_layout(
@@ -230,7 +235,6 @@ with tab2:
             st.info("Selecciona al menos un jugador para visualizar el radar.")
     else:
         st.info("Por favor, sube el archivo de mediocampistas desde la barra lateral para usar el radar.")
-
 
 # --- Defensas Centrales ---
 with tab3:
@@ -262,7 +266,7 @@ with tab3:
     else:
         st.info("Por favor, sube el archivo de defensas centrales desde la barra lateral.")
 
-# --- Radar Defensas Centrales (modificado) ---
+# --- Radar Defensas Centrales (modificado con colores) ---
 with tab4:
     if uploaded_file_cbs is not None:
         df_radar_cbs = pd.read_excel(uploaded_file_cbs)
@@ -280,9 +284,11 @@ with tab4:
         if selected_players_cbs:
             metrics_cbs = roles_metrics_cbs[selected_role_cbs]["Metrics"]
             labels_cbs = metrics_cbs + [metrics_cbs[0]]  # cerrar círculo
+
+            colors = px.colors.qualitative.Plotly  
             fig_cbs = go.Figure()
 
-            for player_cbs in selected_players_cbs:
+            for i, player_cbs in enumerate(selected_players_cbs):
                 player_radar_row_cbs = df_radar_cbs[df_radar_cbs["Player"] == player_cbs]
                 if not player_radar_row_cbs.empty:
                     player_radar_row_cbs = player_radar_row_cbs.iloc[0]
@@ -296,7 +302,8 @@ with tab4:
                         r=values_cbs,
                         theta=labels_cbs,
                         fill='toself',
-                        name=player_cbs
+                        name=player_cbs,
+                        line_color=colors[i % len(colors)]
                     ))
 
             fig_cbs.update_layout(
@@ -309,3 +316,4 @@ with tab4:
             st.info("Selecciona al menos un defensa central para visualizar el radar.")
     else:
         st.info("Por favor, sube el archivo de defensas centrales desde la barra lateral para usar el radar.")
+
