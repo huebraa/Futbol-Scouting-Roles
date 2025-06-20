@@ -3,12 +3,10 @@ import pandas as pd
 import numpy as np
 import io
 
-# --- Tu mapeo de columnas ---
-column_map = {
-    'Minutos jugados': 'Minutes played',
-    'Altura': 'Height',
-    'Edad': 'Age'
-}
+# --- Tus columnas en inglés según tu Excel ---
+MINUTOS_COL = "Minutes Played"
+ALTURA_COL = "Height"
+EDAD_COL = "Age"
 
 # --- Tus roles y métricas ---
 roles_metrics = {
