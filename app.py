@@ -176,7 +176,7 @@ with tab1:
         if df_filtered.empty:
             st.warning("No se encontraron jugadores con esos filtros.")
         else:
-            df_score = calculate_score_all_roles(df_filtered, roles_metrics_mid)
+            df_score = calculate_score_all_roles_wide(df_filtered, roles_metrics_mid)
             st.dataframe(df_score, use_container_width=True)
     else:
         st.info("Por favor, sube el archivo de mediocampistas desde la barra lateral.")
@@ -254,7 +254,7 @@ with tab3:
         if df_filtered_cbs.empty:
             st.warning("No se encontraron defensas centrales con esos filtros.")
         else:
-            df_score_cbs = calculate_score_all_roles(df_filtered_cbs, roles_metrics_cbs)
+            df_score_cbs = calculate_score_all_roles_wide(df_filtered_cbs, roles_metrics_cbs)
             st.dataframe(df_score_cbs, use_container_width=True)
     else:
         st.info("Por favor, sube el archivo de defensas centrales desde la barra lateral.")
