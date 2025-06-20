@@ -55,6 +55,13 @@ def filter_players(df, filter_params):
                 df = df[df[column] == value]
     return df
 
+def normalize_series(s):
+    min_val, max_val = s.min(), s.max()
+    if max_val > min_val:
+        return (s - min_val) / (max_val - min_val) * 100
+    else:
+        return s * 0 + 50  # Si no hay variación, dar valor medio
+
 def calculate_score(df, role):
     metrics = roles_metrics[role]["Metrics"]
     weights = roles_metrics[role]["Weights"]
@@ -63,12 +70,10 @@ def calculate_score(df, role):
     df["Puntaje"] = 0.0
     for metric, weight in zip(metrics, weights):
         if metric in df.columns:
-            min_val, max_val = df[metric].min(), df[metric].max()
-            if max_val > min_val:
-                df[metric] = (df[metric] - min_val) / (max_val - min_val) * 100
-            df["Puntaje"] += df[metric] * weight
+            df[metric + " Normalized"] = normalize_series(df[metric])
+            df["Puntaje"] += df[metric + " Normalized"] * weight
 
-    df["Puntaje Normalizado"] = (df["Puntaje"] - df["Puntaje"].min()) / (df["Puntaje"].max() - df["Puntaje"].min()) * 100
+    df["Puntaje Normalizado"] = normalize_series(df["Puntaje"])
 
     return df[["Player", "Team", "Position", "Puntaje", "Puntaje Normalizado"]].sort_values(by="Puntaje", ascending=False)
 
@@ -81,13 +86,11 @@ def calculate_roles(df):
 
         for metric, weight in zip(metrics, weights):
             if metric in df.columns:
-                min_val, max_val = df[metric].min(), df[metric].max()
-                if max_val > min_val:
-                    df[metric] = (df[metric] - min_val) / (max_val - min_val) * 100
-                df[role] += df[metric] * weight
+                df[metric + " Normalized"] = normalize_series(df[metric])
+                df[role] += df[metric + " Normalized"] * weight
 
     for role in roles_metrics.keys():
-        df[f"{role} Normalized"] = (df[role] - df[role].min()) / (df[role].max() - df[role].min()) * 100
+        df[f"{role} Normalized"] = normalize_series(df[role])
 
     def best_role(row):
         first_group = sorted(list(roles_metrics.keys())[:6], key=lambda role: row[f"{role} Normalized"], reverse=True)[0]
@@ -98,6 +101,103 @@ def calculate_roles(df):
 
     columns_to_keep = ["Player", "Team", "Position", "Best Role Combined"] + [f"{role} Normalized" for role in roles_metrics.keys()]
     return df[columns_to_keep]
+
+def plot_radar(player_row, role):
+    metrics = roles_metrics[role]["Metrics"]
+    weights = roles_metrics[role]["Weights"]
+
+    # Usamos métricas normalizadas
+    values = []
+    labels = []
+    for metric in metrics:
+        col_norm = metric + " Normalized"
+        if col_norm in player_row:
+            values.append(player_row[col_norm])
+            labels.append(metric)
+    if not values:
+        st.warning("No hay métricas para graficar.")
+        return
+
+    fig = go.Figure()
+
+    fig.add_trace(go.Scatterpolar(
+        r=values + [values[0]],  # cerramos círculo
+        theta=labels + [labels[0]],
+        fill='toself',
+        name=player_row["Player"]
+    ))
+
+    fig.update_layout(
+        polar=dict(
+            radialaxis=dict(
+                visible=True,
+                range=[0, 100]
+            )
+        ),
+        showlegend=False,
+        title=f"Radar de {player_row['Player']} - Rol: {role}"
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+# --- Streamlit App ---
+st.title("Filtro y Puntajes de Jugadores")
+
+uploaded_file = st.file_uploader("Sube tu archivo Excel", type=["xlsx"])
+
+if uploaded_file is not None:
+    df_raw = pd.read_excel(uploaded_file)
+
+    # Renombrar columnas si están en inglés (al revés del mapping)
+    df_raw = df_raw.rename(columns={v: k for k, v in column_map.items()})
+
+    st.write("Datos cargados:")
+    st.dataframe(df_raw.head())
+
+    # Sliders para filtro
+    minutos_min, minutos_max = int(df_raw['Minutos jugados'].min()), int(df_raw['Minutos jugados'].max())
+    altura_min, altura_max = max(0, int(df_raw['Altura'].min())), int(df_raw['Altura'].max())
+    edad_min, edad_max = int(df_raw['Edad'].min()), int(df_raw['Edad'].max())
+
+    minutos = st.slider("Minutos jugados", min_value=minutos_min, max_value=minutos_max, value=(minutos_min, minutos_max))
+    altura = st.slider("Altura (cm)", min_value=altura_min, max_value=altura_max, value=(altura_min, altura_max))
+    edad = st.slider("Edad", min_value=edad_min, max_value=edad_max, value=(edad_min, edad_max))
+
+    role = st.selectbox("Selecciona un rol para puntuar", list(roles_metrics.keys()))
+
+    if st.button("Filtrar y Calcular Puntajes"):
+        filter_params = {
+            'Minutos jugados': minutos,
+            'Altura': altura,
+            'Edad': edad
+        }
+
+        df_filtered = filter_players(df_raw, filter_params)
+        if df_filtered.empty:
+            st.warning("No se encontraron jugadores con esos filtros.")
+        else:
+            df_score = calculate_score(df_filtered, role)
+            df_roles = calculate_roles(df_filtered)
+            df_final = pd.merge(df_score, df_roles, on=["Player", "Team", "Position"])
+
+            # Poner colores a las columnas numéricas relevantes
+            styled_df = df_final.style.background_gradient(subset=["Puntaje", "Puntaje Normalizado"] + [f"{r} Normalized" for r in roles_metrics.keys()], cmap='RdYlGn')
+
+            # Crear pestañas
+            tab1, tab2 = st.tabs(["Tabla de Jugadores", "Radar de Jugadores"])
+
+            with tab1:
+                st.write("Jugadores filtrados con puntajes:")
+                st.dataframe(styled_df, use_container_width=True)
+
+            with tab2:
+                st.write("Selecciona un jugador para ver el radar:")
+                selected_player = st.selectbox("Jugador", df_final["Player"].unique())
+                st.write("Selecciona un rol para radar:")
+                selected_role = st.selectbox("Rol para radar", list(roles_metrics.keys()))
+
+                player_data = df_final[df_final["Player"] == selected_player].iloc[0]
+                plot_radar(player_data, selected_role)
 
 # Diccionario con nombres, descripción y número típico de posición
 role_descriptions = {
@@ -123,136 +223,17 @@ role_descriptions = {
     },
     "Distributor": {
         "Nombre": "Distribuidor de Juego",
-        "Descripción": "Especialista en circulación y distribución. Preciso en pases hacia el frente y cambios de orientación.",
-        "Posición": "6 / 8"
+        "Descripción": "Especialista en circulación y distribución. Preciso en pases largos y en progresión del balón.",
+        "Posición": "6"
     },
     "Builder": {
-        "Nombre": "Constructor desde Atrás",
-        "Descripción": "Inicia la jugada desde zonas más retrasadas. Seguro con el balón y fuerte en tareas defensivas básicas.",
-        "Posición": "5 / 6"
+        "Nombre": "Constructor de Juego",
+        "Descripción": "Fomenta la posesión, realiza pases seguros y apoya en recuperación.",
+        "Posición": "8 / 6"
     },
     "Defensive Mid": {
-        "Nombre": "Mediocentro Defensivo",
-        "Descripción": "Recuperador puro. Interrumpe el juego rival y protege la zona delante de la defensa.",
+        "Nombre": "Mediocampista Defensivo",
+        "Descripción": "Especializado en recuperación y contención. Incide en el juego defensivo y equilibrio del equipo.",
         "Posición": "6"
     }
 }
-
-# --- Streamlit App ---
-st.title("Filtro y Puntajes de Jugadores")
-
-uploaded_file = st.file_uploader("Sube tu archivo Excel", type=["xlsx"])
-
-if uploaded_file is not None:
-    df_raw = pd.read_excel(uploaded_file)
-
-    # Renombrar columnas
-    df_raw = df_raw.rename(columns={v: k for k, v in column_map.items()})
-
-    st.write("Datos cargados:")
-    st.dataframe(df_raw.head())
-
-    # Sliders para filtro
-    minutos_min, minutos_max = int(df_raw['Minutos jugados'].min()), int(df_raw['Minutos jugados'].max())
-    altura_min, altura_max = max(0, int(df_raw['Altura'].min())), int(df_raw['Altura'].max())
-    edad_min, edad_max = int(df_raw['Edad'].min()), int(df_raw['Edad'].max())
-
-    minutos = st.slider("Minutos jugados", min_value=minutos_min, max_value=minutos_max, value=(minutos_min, minutos_max))
-    altura = st.slider("Altura (cm)", min_value=altura_min, max_value=altura_max, value=(altura_min, altura_max))
-    edad = st.slider("Edad", min_value=edad_min, max_value=edad_max, value=(edad_min, edad_max))
-
-    role = st.selectbox("Selecciona un rol", list(roles_metrics.keys()))
-
-    if st.button("Filtrar y Calcular Puntajes"):
-        filter_params = {
-            'Minutos jugados': minutos,
-            'Altura': altura,
-            'Edad': edad
-        }
-
-        df_filtered = filter_players(df_raw, filter_params)
-        if df_filtered.empty:
-            st.warning("No se encontraron jugadores con esos filtros.")
-        else:
-            df_score = calculate_score(df_filtered, role)
-            df_roles = calculate_roles(df_filtered)
-            df_final = pd.merge(df_score, df_roles, on=["Player", "Team", "Position"])
-
-            st.write("Jugadores filtrados con puntajes:")
-            
-            # Mostrar tabla coloreada con pandas Styler
-            puntajes_cols = [col for col in df_final.columns if "Normalized" in col]
-            styled_df = df_final.style.background_gradient(subset=puntajes_cols, cmap='Greens')
-            st.dataframe(styled_df, use_container_width=True)
-
-            # --- Gráfico Radar ---
-            best_player = df_final.iloc[0]
-
-            st.markdown(f"## 🏆 Mejor jugador: {best_player['Player']} ({best_player['Team']})")
-
-            metrics = roles_metrics[role]["Metrics"]
-            player_row = df_filtered[df_filtered["Player"] == best_player["Player"]].iloc[0]
-
-            metric_values = []
-            for metric in metrics:
-                if metric in df_filtered.columns:
-                    min_val, max_val = df_filtered[metric].min(), df_filtered[metric].max()
-                    val = player_row[metric]
-                    if max_val > min_val:
-                        norm_val = (val - min_val) / (max_val - min_val) * 100
-                    else:
-                        norm_val = 0
-                    metric_values.append(norm_val)
-                else:
-                    metric_values.append(0)
-
-            metric_values += metric_values[:1]
-            metrics_radar = metrics + [metrics[0]]
-
-            fig = go.Figure(
-                data=go.Scatterpolar(
-                    r=metric_values,
-                    theta=metrics_radar,
-                    fill='toself',
-                    name=best_player['Player']
-                )
-            )
-
-            fig.update_layout(
-                polar=dict(
-                    radialaxis=dict(
-                        visible=True,
-                        range=[0, 100]
-                    )
-                ),
-                showlegend=False,
-                title=f"Métricas normalizadas de {best_player['Player']} para rol {role}"
-            )
-
-            st.plotly_chart(fig, use_container_width=True)
-
-            # Botón para exportar Excel
-            def to_excel(df):
-                import io
-                output = io.BytesIO()
-                with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                    df.to_excel(writer, index=False)
-                processed_data = output.getvalue()
-                return processed_data
-
-            excel_data = to_excel(df_final)
-
-            st.download_button(
-                label="Exportar a Excel",
-                data=excel_data,
-                file_name="jugadores_puntajes.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
-
-# Mostrar descripción de roles (fuera del upload)
-selected_role = st.selectbox("DESCRIPCIÓN DE ROLES (para aprender)", list(role_descriptions.keys()))
-if selected_role:
-    desc = role_descriptions[selected_role]
-    st.markdown(f"### {desc['Nombre']}")
-    st.markdown(f"**Posición típica:** {desc['Posición']}")
-    st.markdown(desc['Descripción'])
