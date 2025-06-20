@@ -183,10 +183,15 @@ with tab1:
         altura_min, altura_max = max(0, int(df_mid['Altura'].min())), int(df_mid['Altura'].max())
         edad_min, edad_max = int(df_mid['Edad'].min()), int(df_mid['Edad'].max())
 
+        st.header("Roles disponibles y sus descripciones")
+        show_role_descriptions(role_descriptions_mid)
+
         st.header("Filtrar y visualizar tabla - Mediocampistas")
         minutos = st.slider("Minutos jugados", min_value=minutos_min, max_value=minutos_max, value=(minutos_min, minutos_max))
         altura = st.slider("Altura (cm)", min_value=altura_min, max_value=altura_max, value=(altura_min, altura_max))
         edad = st.slider("Edad", min_value=edad_min, max_value=edad_max, value=(edad_min, edad_max))
+
+        role_for_score = st.selectbox("Selecciona un rol para calcular puntajes", list(roles_metrics_mid.keys()))
 
         if st.button("Filtrar y Calcular Puntajes (Mediocampistas)"):
             filter_params = {
@@ -199,20 +204,9 @@ with tab1:
             if df_filtered.empty:
                 st.warning("No se encontraron jugadores con esos filtros.")
             else:
-                # Calculamos scores para todos los roles y unimos resultados
-                all_scores = []
-                for role in roles_metrics_mid.keys():
-                    df_score = calculate_score(df_filtered, roles_metrics_mid, role)
-                    df_score = df_score.rename(columns={"Puntaje Normalizado": f"Puntaje Normalizado - {role}"})
-                    all_scores.append(df_score.set_index(["Player", "Team", "Position"]))
+                df_score_all = calculate_all_scores(df_filtered, roles_metrics_mid)
+                st.dataframe(df_score_all, use_container_width=True)
 
-                df_all_scores = pd.concat(all_scores, axis=1).reset_index()
-
-                # Aplicamos estilo de color a todas las columnas de puntaje normalizado
-                puntaje_cols = [col for col in df_all_scores.columns if "Puntaje Normalizado" in col]
-                styled_df = df_all_scores.style.background_gradient(subset=puntaje_cols, cmap='YlGnBu').highlight_max(subset=puntaje_cols, color='lightgreen')
-
-                st.dataframe(styled_df, use_container_width=True)
     else:
         st.info("Por favor, sube el archivo de mediocampistas desde la barra lateral.")
 
@@ -299,19 +293,8 @@ with tab3:
             if df_filtered_cbs.empty:
                 st.warning("No se encontraron jugadores con esos filtros.")
             else:
-                # Calculamos scores para todos los roles y unimos resultados
-                all_scores_cbs = []
-                for role in roles_metrics_cbs.keys():
-                    df_score_cbs = calculate_score(df_filtered_cbs, roles_metrics_cbs, role)
-                    df_score_cbs = df_score_cbs.rename(columns={"Puntaje Normalizado": f"Puntaje Normalizado - {role}"})
-                    all_scores_cbs.append(df_score_cbs.set_index(["Player", "Team", "Position"]))
+                df_score_cbs = calculate_all_scores(df_filtered_cbs, roles_metrics_cbs)
+                st.dataframe(df_score_cbs, use_container_width=True)
 
-                df_all_scores_cbs = pd.concat(all_scores_cbs, axis=1).reset_index()
-
-                # Aplicamos estilo de color a todas las columnas de puntaje normalizado
-                puntaje_cols_cbs = [col for col in df_all_scores_cbs.columns if "Puntaje Normalizado" in col]
-                styled_df_cbs = df_all_scores_cbs.style.background_gradient(subset=puntaje_cols_cbs, cmap='YlGnBu').highlight_max(subset=puntaje_cols_cbs, color='lightgreen')
-
-                st.dataframe(styled_df_cbs, use_container_width=True)
     else:
         st.info("Por favor, sube el archivo de defensas centrales desde la barra lateral.")
