@@ -166,38 +166,80 @@ if uploaded_file is not None:
     role = st.selectbox("Selecciona un rol para puntuar", list(roles_metrics.keys()))
 
     if st.button("Filtrar y Calcular Puntajes"):
-        filter_params = {
-            'Minutos jugados': minutos,
-            'Altura': altura,
-            'Edad': edad
-        }
+    filter_params = {
+        'Minutos jugados': minutos,
+        'Altura': altura,
+        'Edad': edad
+    }
 
-        df_filtered = filter_players(df_raw, filter_params)
-        if df_filtered.empty:
-            st.warning("No se encontraron jugadores con esos filtros.")
-        else:
-            df_score = calculate_score(df_filtered, role)
-            df_roles = calculate_roles(df_filtered)
-            df_final = pd.merge(df_score, df_roles, on=["Player", "Team", "Position"])
+    df_filtered = filter_players(df_raw, filter_params)
+    if df_filtered.empty:
+        st.warning("No se encontraron jugadores con esos filtros.")
+    else:
+        # Calculamos scores globales para el rol seleccionado para tabla
+        df_score = calculate_score(df_filtered, role)
+        df_roles = calculate_roles(df_filtered)
+        df_final = pd.merge(df_score, df_roles, on=["Player", "Team", "Position"])
 
-            # Poner colores a las columnas numéricas relevantes
-            styled_df = df_final.style.background_gradient(subset=["Puntaje", "Puntaje Normalizado"] + [f"{r} Normalized" for r in roles_metrics.keys()], cmap='RdYlGn')
+        # --- Normalizamos las métricas para todos los roles y jugadores para los radares ---
+        # Creamos un df copia para normalizar métricas usadas en roles
+        df_radar = df_filtered.copy()
+        for r in roles_metrics.keys():
+            for metric in roles_metrics[r]["Metrics"]:
+                if metric in df_radar.columns:
+                    norm_col = metric + " Normalized"
+                    df_radar[norm_col] = normalize_series(df_radar[metric])
 
-            # Crear pestañas
-            tab1, tab2 = st.tabs(["Tabla de Jugadores", "Radar de Jugadores"])
+        # Estilizado de tabla
+        styled_df = df_final.style.background_gradient(subset=["Puntaje", "Puntaje Normalizado"] + [f"{r} Normalized" for r in roles_metrics.keys()], cmap='RdYlGn')
 
-            with tab1:
-                st.write("Jugadores filtrados con puntajes:")
-                st.dataframe(styled_df, use_container_width=True)
+        # Tabs
+        tab1, tab2 = st.tabs(["Tabla de Jugadores", "Radar de Jugadores"])
 
-            with tab2:
-                st.write("Selecciona un jugador para ver el radar:")
-                selected_player = st.selectbox("Jugador", df_final["Player"].unique())
-                st.write("Selecciona un rol para radar:")
-                selected_role = st.selectbox("Rol para radar", list(roles_metrics.keys()))
+        with tab1:
+            st.write("Jugadores filtrados con puntajes:")
+            st.dataframe(styled_df, use_container_width=True)
 
-                player_data = df_final[df_final["Player"] == selected_player].iloc[0]
-                plot_radar(player_data, selected_role)
+        with tab2:
+            st.write("Selecciona un jugador para ver el radar:")
+            selected_player = st.selectbox("Jugador", df_final["Player"].unique())
+            st.write("Selecciona un rol para radar:")
+            selected_role = st.selectbox("Rol para radar", list(roles_metrics.keys()))
+
+            # Obtenemos fila jugador con las métricas normalizadas para radar:
+            player_radar_row = df_radar[df_radar["Player"] == selected_player].iloc[0]
+
+            # Preparamos datos para radar: solo métricas normalizadas del rol elegido
+            metrics = roles_metrics[selected_role]["Metrics"]
+            values = []
+            labels = []
+            for metric in metrics:
+                norm_col = metric + " Normalized"
+                if norm_col in player_radar_row:
+                    values.append(player_radar_row[norm_col])
+                    labels.append(metric)
+
+            if values:
+                # Cerramos el círculo para radar
+                values += [values[0]]
+                labels += [labels[0]]
+
+                fig = go.Figure(go.Scatterpolar(
+                    r=values,
+                    theta=labels,
+                    fill='toself',
+                    name=selected_player
+                ))
+
+                fig.update_layout(
+                    polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
+                    showlegend=False,
+                    title=f"Radar de {selected_player} - Rol: {selected_role}"
+                )
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.warning("No hay métricas disponibles para este jugador y rol.")
+
 
 # Diccionario con nombres, descripción y número típico de posición
 role_descriptions = {
