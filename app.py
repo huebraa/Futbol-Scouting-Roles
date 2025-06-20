@@ -144,19 +144,24 @@ def calculate_all_scores(df, roles_metrics):
 def style_scores(df_scores):
     # Estilos de gradiente para cada columna (rol)
     def color_scale(val):
+        try:
+            val = float(val)
+        except (ValueError, TypeError):
+            return ''
         if pd.isna(val):
             return ''
         green = int(255 * (val / 100))
         red = 255 - green
         return f'background-color: rgb({red}, {green}, 0)'
 
-    styled = df_scores.style.applymap(color_scale, subset=df_scores.columns[3:])
     # Resaltar el mejor en cada fila
     def highlight_max(s):
         is_max = s == s.max()
         return ['font-weight: bold; border: 2px solid black;' if v else '' for v in is_max]
 
-    styled = styled.apply(highlight_max, axis=1, subset=df_scores.columns[3:])
+    puntaje_cols = df_scores.columns[3:]  # asumiendo que las primeras 3 son Player, Team, Position
+    styled = df_scores.style.applymap(color_scale, subset=puntaje_cols)
+
     return styled
 
 # --- Streamlit App ---
