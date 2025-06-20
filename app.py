@@ -139,10 +139,15 @@ def calculate_score_all_roles(df, roles_metrics):
 
 def style_scores(df):
     if "Puntaje Normalizado" in df.columns:
-        return df.style.background_gradient(subset=["Puntaje Normalizado"], cmap="Greens") \
-                       .format({"Puntaje": "{:.2f}", "Puntaje Normalizado": "{:.2f}"})
+        try:
+            return df.style.background_gradient(subset=["Puntaje Normalizado"], cmap="Greens") \
+                           .format({"Puntaje": "{:.2f}", "Puntaje Normalizado": "{:.2f}"})
+        except KeyError as e:
+            st.error(f"Error al aplicar estilo: {e}")
+            return df.style.format({"Puntaje": "{:.2f}"})
     else:
         return df.style.format({"Puntaje": "{:.2f}"})
+
 
 
 # --- Streamlit App ---
