@@ -146,7 +146,6 @@ uploaded_file_cbs = st.sidebar.file_uploader("Sube archivo defensas centrales", 
 
 tab1, tab2, tab3, tab4 = st.tabs(["Mediocampistas", "Radar Mediocampistas", "Defensas Centrales", "Radar Defensas Centrales"])
 
-# --- Mediocampistas ---
 with tab1:
     if uploaded_file_mid is not None:
         df_mid = pd.read_excel(uploaded_file_mid)
@@ -164,24 +163,24 @@ with tab1:
         # Mostrar descripciones de roles
         st.subheader("Roles y Descripciones")
         for role, desc in role_descriptions.items():
-            st.markdown(f"**{desc['Nombre']} ({role})**")
+            st.markdown(f"**{desc['Nombre']} ({role.strip()})**")
             st.markdown(f"Posición típica: {desc['Posición']}")
             st.markdown(f"{desc['Descripción']}\n")
 
-        if st.button("Filtrar y Calcular Puntajes (Mediocampistas)"):
-            filter_params = {
-                'Minutos jugados': minutos,
-                'Altura': altura,
-                'Edad': edad
-            }
-            df_filtered = filter_players(df_mid, filter_params)
-            if df_filtered.empty:
-                st.warning("No se encontraron jugadores con esos filtros.")
-            else:
-                df_score = calculate_score_all_roles(df_filtered, roles_metrics_mid)
-                st.dataframe(df_score, use_container_width=True)
+        filter_params = {
+            'Minutos jugados': minutos,
+            'Altura': altura,
+            'Edad': edad
+        }
+        df_filtered = filter_players(df_mid, filter_params)
+        if df_filtered.empty:
+            st.warning("No se encontraron jugadores con esos filtros.")
+        else:
+            df_score = calculate_score_all_roles(df_filtered, roles_metrics_mid)
+            st.dataframe(df_score, use_container_width=True)
     else:
         st.info("Por favor, sube el archivo de mediocampistas desde la barra lateral.")
+
 
 # --- Radar Mediocampistas (modificado) ---
 with tab2:
@@ -232,7 +231,6 @@ with tab2:
         st.info("Por favor, sube el archivo de mediocampistas desde la barra lateral para usar el radar.")
 
 
-# --- Defensas Centrales ---
 with tab3:
     if uploaded_file_cbs is not None:
         df_cbs = pd.read_excel(uploaded_file_cbs)
@@ -247,20 +245,20 @@ with tab3:
         altura_cbs = st.slider("Altura (cm)", min_value=altura_min_cbs, max_value=altura_max_cbs, value=(altura_min_cbs, altura_max_cbs))
         edad_cbs = st.slider("Edad", min_value=edad_min_cbs, max_value=edad_max_cbs, value=(edad_min_cbs, edad_max_cbs))
 
-        if st.button("Filtrar y Calcular Puntajes (Defensas Centrales)"):
-            filter_params_cbs = {
-                'Minutos jugados': minutos_cbs,
-                'Altura': altura_cbs,
-                'Edad': edad_cbs
-            }
-            df_filtered_cbs = filter_players(df_cbs, filter_params_cbs)
-            if df_filtered_cbs.empty:
-                st.warning("No se encontraron defensas centrales con esos filtros.")
-            else:
-                df_score_cbs = calculate_score_all_roles(df_filtered_cbs, roles_metrics_cbs)
-                st.dataframe(df_score_cbs, use_container_width=True)
+        filter_params_cbs = {
+            'Minutos jugados': minutos_cbs,
+            'Altura': altura_cbs,
+            'Edad': edad_cbs
+        }
+        df_filtered_cbs = filter_players(df_cbs, filter_params_cbs)
+        if df_filtered_cbs.empty:
+            st.warning("No se encontraron defensas centrales con esos filtros.")
+        else:
+            df_score_cbs = calculate_score_all_roles(df_filtered_cbs, roles_metrics_cbs)
+            st.dataframe(df_score_cbs, use_container_width=True)
     else:
         st.info("Por favor, sube el archivo de defensas centrales desde la barra lateral.")
+
 
 # --- Radar Defensas Centrales (modificado) ---
 with tab4:
