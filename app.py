@@ -71,51 +71,53 @@ roles_metrics = {
     }
 }
 
-# --- Funciones ---
-def filter_players(df, filter_params):
-    for column, value in filter_params.items():
-        if column in df.columns:
-            if isinstance(value, tuple):
-                min_value, max_value = value
-                df = df[(df[column] >= min_value) & (df[column] <= max_value)]
-            else:
-                df = df[df[column] == value]
-    return df
+# Mapeo de columnas si hace falta
+column_map = {
+    'Minutos jugados': 'Minutes played',
+    'Altura': 'Height',
+    'Edad': 'Age'
+}
 
-def calculate_score(df, role):
-    metrics = roles_metrics[role]["Metrics"]
-    weights = roles_metrics[role]["Weights"]
+@st.cache_data
+def load_and_process(file) -> pd.DataFrame:
+    df = pd.read_excel(file)
 
-    df = df.copy()
-    df["Puntaje"] = 0.0
-    for metric, weight in zip(metrics, weights):
+    # Renombrar columnas si están en otro idioma
+    df = df.rename(columns={v: k for k, v in column_map.items()})
+
+    # Normalizar las métricas por rol UNA vez
+    # Primero normalizamos las columnas relevantes para todos los roles
+    all_metrics = set()
+    for role in roles_metrics.values():
+        all_metrics.update(role["Metrics"])
+    all_metrics = list(all_metrics)
+
+    for metric in all_metrics:
         if metric in df.columns:
             min_val, max_val = df[metric].min(), df[metric].max()
             if max_val > min_val:
-                df[metric] = (df[metric] - min_val) / (max_val - min_val) * 100
-            df["Puntaje"] += df[metric] * weight
+                df[metric + " Normalized"] = (df[metric] - min_val) / (max_val - min_val) * 100
+            else:
+                df[metric + " Normalized"] = 0
 
-    df["Puntaje Normalizado"] = (df["Puntaje"] - df["Puntaje"].min()) / (df["Puntaje"].max() - df["Puntaje"].min()) * 100
-
-    return df[["Player", "Team", "Position", "Puntaje", "Puntaje Normalizado"]].sort_values(by="Puntaje", ascending=False)
-
-def calculate_roles(df):
-    df = df.copy()
-    for role in roles_metrics.keys():
-        df[role] = 0.0
-        metrics = roles_metrics[role]["Metrics"]
-        weights = roles_metrics[role]["Weights"]
-
+    # Precalcular puntajes por rol usando columnas normalizadas para acelerar cálculo
+    for role_name, data in roles_metrics.items():
+        metrics = data["Metrics"]
+        weights = data["Weights"]
+        df[role_name] = 0
         for metric, weight in zip(metrics, weights):
-            if metric in df.columns:
-                min_val, max_val = df[metric].min(), df[metric].max()
-                if max_val > min_val:
-                    df[metric] = (df[metric] - min_val) / (max_val - min_val) * 100
-                df[role] += df[metric] * weight
+            norm_col = metric + " Normalized"
+            if norm_col in df.columns:
+                df[role_name] += df[norm_col] * weight
 
-    for role in roles_metrics.keys():
-        df[f"{role} Normalized"] = (df[role] - df[role].min()) / (df[role].max() - df[role].min()) * 100
+        # Normalizar puntaje rol
+        min_val, max_val = df[role_name].min(), df[role_name].max()
+        if max_val > min_val:
+            df[role_name + " Normalized"] = (df[role_name] - min_val) / (max_val - min_val) * 100
+        else:
+            df[role_name + " Normalized"] = 0
 
+    # Calcular mejor rol combinado (primero + segundo mejor normalizado)
     def best_role(row):
         first_group = sorted(list(roles_metrics.keys())[:6], key=lambda role: row[f"{role} Normalized"], reverse=True)[0]
         second_group = sorted(list(roles_metrics.keys())[6:], key=lambda role: row[f"{role} Normalized"], reverse=True)[0]
@@ -123,65 +125,78 @@ def calculate_roles(df):
 
     df["Best Role Combined"] = df.apply(best_role, axis=1)
 
-    columns_to_keep = ["Player", "Team", "Position", "Best Role Combined"] + [f"{role} Normalized" for role in roles_metrics.keys()]
-    return df[columns_to_keep]
+    return df
 
-# --- Streamlit App ---
-st.title("Filtro y Puntajes de Jugadores")
+def filter_players(df, minutos, altura, edad):
+    return df[
+        (df['Minutos jugados'] >= minutos[0]) & (df['Minutos jugados'] <= minutos[1]) &
+        (df['Altura'] >= altura[0]) & (df['Altura'] <= altura[1]) &
+        (df['Edad'] >= edad[0]) & (df['Edad'] <= edad[1])
+    ]
 
-uploaded_file = st.file_uploader("Sube tu archivo Excel", type=["xlsx"])
+def calculate_score(df, role):
+    # Muestra sólo columnas clave con el puntaje calculado para ese rol
+    cols = ["Player", "Team", "Position"]
+    if role in df.columns:
+        cols.append(role)
+    if role + " Normalized" in df.columns:
+        cols.append(role + " Normalized")
+    cols.append("Best Role Combined")
+
+    return df[cols].sort_values(by=role, ascending=False)
+
+def to_excel(df):
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False)
+    return output.getvalue()
+
+# --- Streamlit app ---
+
+st.title("Scouting Roles - Evaluación de Jugadores")
+
+uploaded_file = st.file_uploader("Sube archivo Excel con datos de jugadores (.xlsx)", type=["xlsx"])
 
 if uploaded_file is not None:
-    df_raw = pd.read_excel(uploaded_file)
+    df = load_and_process(uploaded_file)
 
-    # Renombrar columnas
-    df_raw = df_raw.rename(columns={v: k for k, v in column_map.items()})
+    st.sidebar.header("Filtros")
 
-    st.write("Datos cargados:")
-    st.dataframe(df_raw.head())
+    minutos = st.sidebar.slider(
+        "Minutos jugados",
+        int(df['Minutos jugados'].min()),
+        int(df['Minutos jugados'].max()),
+        (int(df['Minutos jugados'].min()), int(df['Minutos jugados'].max()))
+    )
 
-    # Sliders para filtro
-    minutos_min, minutos_max = int(df_raw['Minutos jugados'].min()), int(df_raw['Minutos jugados'].max())
-    altura_min, altura_max = max(0, int(df_raw['Altura'].min())), int(df_raw['Altura'].max())
-    edad_min, edad_max = int(df_raw['Edad'].min()), int(df_raw['Edad'].max())
+    altura = st.sidebar.slider(
+        "Altura (cm)",
+        int(df['Altura'].min()),
+        int(df['Altura'].max()),
+        (int(df['Altura'].min()), int(df['Altura'].max()))
+    )
 
-    minutos = st.slider("Minutos jugados", min_value=minutos_min, max_value=minutos_max, value=(minutos_min, minutos_max))
-    altura = st.slider("Altura (cm)", min_value=altura_min, max_value=altura_max, value=(altura_min, altura_max))
-    edad = st.slider("Edad", min_value=edad_min, max_value=edad_max, value=(edad_min, edad_max))
+    edad = st.sidebar.slider(
+        "Edad",
+        int(df['Edad'].min()),
+        int(df['Edad'].max()),
+        (int(df['Edad'].min()), int(df['Edad'].max()))
+    )
 
-    role = st.selectbox("Selecciona un rol", list(roles_metrics.keys()))
+    role = st.sidebar.selectbox("Selecciona un rol", list(roles_metrics.keys()))
 
-    if st.button("Filtrar y Calcular Puntajes"):
-        filter_params = {
-            'Minutos jugados': minutos,
-            'Altura': altura,
-            'Edad': edad
-        }
+    df_filtered = filter_players(df, minutos, altura, edad)
 
-        df_filtered = filter_players(df_raw, filter_params)
-        if df_filtered.empty:
-            st.warning("No se encontraron jugadores con esos filtros.")
-        else:
-            df_score = calculate_score(df_filtered, role)
-            df_roles = calculate_roles(df_filtered)
-            df_final = pd.merge(df_score, df_roles, on=["Player", "Team", "Position"])
-            st.write("Jugadores filtrados con puntajes:")
-            st.dataframe(df_final.head(20))
+    df_scores = calculate_score(df_filtered, role)
 
-            # Botón para exportar Excel
-            def to_excel(df):
-                import io
-                output = io.BytesIO()
-                with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                    df.to_excel(writer, index=False)
-                processed_data = output.getvalue()
-                return processed_data
+    st.subheader(f"Jugadores filtrados con puntaje para rol: {role}")
+    st.dataframe(df_scores.head(20))
 
-            excel_data = to_excel(df_final)
+    excel_data = to_excel(df_scores)
 
-            st.download_button(
-                label="Exportar a Excel",
-                data=excel_data,
-                file_name="jugadores_puntajes.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
+    st.download_button(
+        label="Exportar resultados a Excel",
+        data=excel_data,
+        file_name="jugadores_puntajes.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
