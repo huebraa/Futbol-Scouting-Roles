@@ -121,23 +121,31 @@ def calculate_roles(df):
 
         for metric, weight in zip(metrics, weights):
             if metric in df.columns:
-                df[metric + " Normalized"] = normalize_series(df[metric])
+                min_val, max_val = df[metric].min(), df[metric].max()
+                if max_val > min_val:
+                    df[metric + " Normalized"] = (df[metric] - min_val) / (max_val - min_val) * 100
+                else:
+                    df[metric + " Normalized"] = 0
                 df[role] += df[metric + " Normalized"] * weight
 
     for role in roles_metrics.keys():
-        df[f"{role} Normalized"] = normalize_series(df[role])
+        min_val, max_val = df[role].min(), df[role].max()
+        if max_val > min_val:
+            df[f"{role} Normalized"] = (df[role] - min_val) / (max_val - min_val) * 100
+        else:
+            df[f"{role} Normalized"] = 0
 
-    # Elegir el rol con mayor puntaje normalizado
     def best_role(row):
         roles_norm_cols = [f"{role} Normalized" for role in roles_metrics.keys()]
         best_idx = row[roles_norm_cols].idxmax()
-        # Quitar " Normalized" del nombre de la columna para mostrar solo el rol
-        return best_idx.replace(" Normalized", "")
+        # Convierte a str para evitar error
+        return str(best_idx).replace(" Normalized", "")
 
     df["Best Role"] = df.apply(best_role, axis=1)
 
     columns_to_keep = ["Player", "Team", "Position", "Best Role"] + [f"{role} Normalized" for role in roles_metrics.keys()]
     return df[columns_to_keep]
+
 
 
 # --- Streamlit App ---
