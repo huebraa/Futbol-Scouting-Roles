@@ -138,9 +138,12 @@ def calculate_score_all_roles(df, roles_metrics):
     return df_scores
 
 def style_scores(df):
-    # Colorea la columna "Puntaje Normalizado" con un gradiente verde y formatea decimales
-    return df.style.background_gradient(subset=["Puntaje Normalizado"], cmap="Greens") \
-                   .format({"Puntaje": "{:.2f}", "Puntaje Normalizado": "{:.2f}"})
+    if "Puntaje Normalizado" in df.columns:
+        return df.style.background_gradient(subset=["Puntaje Normalizado"], cmap="Greens") \
+                       .format({"Puntaje": "{:.2f}", "Puntaje Normalizado": "{:.2f}"})
+    else:
+        return df.style.format({"Puntaje": "{:.2f}"})
+
 
 # --- Streamlit App ---
 
