@@ -1,3 +1,4 @@
+tengo esto:
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
@@ -134,10 +135,6 @@ def calculate_score_all_roles_wide(df, roles_metrics):
 
     return df_final
 
-def highlight_scores(df):
-    score_cols = [col for col in df.columns if col.startswith("Puntaje_")]
-    return df.style.background_gradient(subset=score_cols, cmap='Greens')
-
 
 # --- Streamlit App ---
 
@@ -181,8 +178,7 @@ with tab1:
             st.warning("No se encontraron jugadores con esos filtros.")
         else:
             df_score = calculate_score_all_roles_wide(df_filtered, roles_metrics_mid)
-            st.dataframe(highlight_scores(df_score), use_container_width=True)
-
+            st.dataframe(df_score, use_container_width=True)
     else:
         st.info("Por favor, sube el archivo de mediocampistas desde la barra lateral.")
 
@@ -261,8 +257,7 @@ with tab3:
             st.warning("No se encontraron defensas centrales con esos filtros.")
         else:
             df_score_cbs = calculate_score_all_roles_wide(df_filtered_cbs, roles_metrics_cbs)
-            st.dataframe(highlight_scores(df_score_cbs), use_container_width=True)
-
+            st.dataframe(df_score_cbs, use_container_width=True)
     else:
         st.info("Por favor, sube el archivo de defensas centrales desde la barra lateral.")
 
