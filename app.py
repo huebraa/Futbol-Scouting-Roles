@@ -78,25 +78,35 @@ def calculate_all_scores(df, roles_metrics):
     for role_name, config in roles_metrics.items():
         metrics = config["Metrics"]
         weights = config["Weights"]
+
+        # Verificar que todas las métricas existan en el DataFrame
+        if not all(metric in df.columns for metric in metrics):
+            continue  # Saltar este rol si falta alguna métrica
+
         df_copy = df.copy()
         df_copy["Puntaje"] = 0.0
 
         for metric, weight in zip(metrics, weights):
-            if metric in df_copy.columns:
-                norm_col = metric + f" ({role_name})"
-                df_copy[norm_col] = normalize_series(df_copy[metric])
-                df_copy["Puntaje"] += df_copy[norm_col] * weight
+            norm_col = metric + f" ({role_name})"
+            df_copy[norm_col] = normalize_series(df_copy[metric])
+            df_copy["Puntaje"] += df_copy[norm_col] * weight
 
         df_copy["Puntaje Normalizado"] = normalize_series(df_copy["Puntaje"])
         df_copy["Rol"] = role_name
-        all_results.append(df_copy[["Player", "Team", "Position", "Puntaje", "Puntaje Normalizado", "Rol"] +
-                                   [metric + f" ({role_name})" for metric in config["Metrics"]]])
 
-    df_concat = pd.concat(all_results)
+        all_results.append(df_copy[["Player", "Team", "Position", "Puntaje", "Puntaje Normalizado", "Rol"] +
+                                   [metric + f" ({role_name})" for metric in metrics]])
+
+    # Verifica que haya al menos un resultado antes de concatenar
+    if not all_results:
+        return pd.DataFrame()  # Devuelve vacío para manejar en la app
+
+    df_concat = pd.concat(all_results, ignore_index=True)
     df_optimo = df_concat.loc[df_concat.groupby("Player")["Puntaje"].idxmax()].copy()
     df_optimo.rename(columns={"Rol": "Rol Óptimo"}, inplace=True)
 
     return df_optimo.sort_values(by="Puntaje", ascending=False)
+
 
 def style_score_table(df):
     styled = df.style
@@ -134,7 +144,11 @@ with tab1:
                 st.warning("No se encontraron jugadores con esos filtros.")
             else:
                 df_score_all = calculate_all_scores(df_filtrado, roles_metrics_mid)
-                st.dataframe(style_score_table(df_score_all), use_container_width=True)
+                if df_score_all.empty:
+                    st.warning("No se pudo calcular ningún rol. Verifica que las métricas estén en el archivo.")
+                else:
+                    st.dataframe(style_score_table(df_score_all), use_container_width=True)
+
     else:
         st.info("Sube el archivo de mediocampistas.")
 
