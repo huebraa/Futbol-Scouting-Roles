@@ -185,7 +185,7 @@ with tab1:
 
         # Mostrar descripciones de roles
         st.subheader("Roles y Descripciones")
-        for role, desc in role_descriptions.items():
+        for role, desc in role_descriptions_mid.items():  # Asumo que tienes diccionario para cada grupo
             st.markdown(f"**{desc['Nombre']} ({role})**")
             st.markdown(f"Posición típica: {desc['Posición']}")
             st.markdown(f"{desc['Descripción']}\n")
@@ -204,7 +204,6 @@ with tab1:
                 st.dataframe(df_score, use_container_width=True)
     else:
         st.info("Por favor, sube el archivo de mediocampistas desde la barra lateral.")
-
 # --- Radar Mediocampistas (modificado) ---
 with tab2:
     if uploaded_file_mid is not None:
