@@ -95,6 +95,32 @@ roles_metrics_laterales = {
         "Weights": [0.55, 0.15, 0.15, 0.15]
     }
 }
+
+roles_metrics_delanteros = {
+
+
+    "Second Striker": {
+        "Metrics": ["xG per 90", "Touches in box per 90", "Non-penalty goals per 90", "xA", "Goal conversion, %", "Successful dribbles, %", "Progressive runs per 90" ],
+        "Weights": [0.2, 0.2, 0.15, 0.15, 0.1, 0.1, 0.1]
+    },
+    "Deep-Lying Striker": {
+        "Metrics": ["xG per 90", "Non-penalty goals per 90", "Deep completions per 90", "Received passes per 90", "Assists per 90" , "Shot assists per 90", "Second assists per 90", "Third assists per 90"],
+        "Weights": [0.125, 0.125, 0.15, 0.15, 0.15, 0.05, 0.025, 0.125]
+    },
+    "Target Man": {
+        "Metrics": ["Touches in box per 90", "Aerial duels won, %","xG per 90", "Shots on target, %", "Non-penalty goals per 90"],
+        "Weights": [0.1, 0.425, 0.225, 0.2, 0.05]
+    },
+    "Playmaking Striker": {
+        "Metrics": ["Short / medium passes per 90", "Received passes per 90", "Shot assists per 90", "Key passes per 90","xG per 90", "Non-penalty goals per 90", "Offensive duels won, %"],
+        "Weights": [0.25, 0.25, 0.1, 0.1, 0.1, 0.1, 0.1]
+    },
+    "Advanced Striker": {
+        "Metrics": ["Accelerations per 90", "Touches in box per 90", "Progressive runs per 90", "Goals per 90","xG per 90", "Goal conversion, %", "xA", "Successful dribbles, %"],
+        "Weights": [0.2, 0.1, 0.2, 0.1, 0.1, 0.1, 0.1, 0.1]
+    }
+}
+
 # --- Diccionario con nombres, descripción y número típico de posición ---
 role_descriptions = {
     "Box Crashers": {
@@ -184,13 +210,14 @@ uploaded_file_mid = st.sidebar.file_uploader("Sube archivo mediocampistas", type
 uploaded_file_cbs = st.sidebar.file_uploader("Sube archivo defensas centrales", type=["xlsx"], key="cbs")
 uploaded_file_wingers = st.sidebar.file_uploader("Sube archivo extremos", type=["xlsx"], key="wingers")
 uploaded_file_laterales = st.sidebar.file_uploader("Sube archivo laterales", type=["xlsx"], key="laterales")
+uploaded_file_delanteros = st.sidebar.file_uploader("Sube archivo laterales", type=["xlsx"], key="delanteros")
 
 
-tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10 = st.tabs([
     "Mediocampistas", "Radar Mediocampistas",
     "Defensas Centrales", "Radar Defensas Centrales",
     "Extremos", "Radar Extremos",
-    "Laterales", "Radar Laterales"
+    "Laterales", "Radar Laterales", "Delatneros", "Radar Delanteros"
 ])
 
 
@@ -522,4 +549,83 @@ with tab8:
     else:
         st.info("Por favor, sube el archivo de laterales desde la barra lateral para usar el radar.")
 
+# --- Delanteros Tabla ---
+with tab9:
+    if uploaded_file_delanteros is not None:
+        df_delanteros = pd.read_excel(uploaded_file_delanteros)
+        df_delanteros = df_delanteros.rename(columns={v: k for k, v in column_map.items()})
+
+        minutos_min_d, minutos_max_d = int(df_delanteros['Minutos jugados'].min()), int(df_delanteros['Minutos jugados'].max())
+        altura_min_d, altura_max_d = max(0, int(df_delanteros['Altura'].min())), int(df_delanteros['Altura'].max())
+        edad_min_d, edad_max_d = int(df_delanteros['Edad'].min()), int(df_delanteros['Edad'].max())
+
+        st.header("Filtrar y visualizar tabla - Delanteros")
+        minutos_d = st.slider("Minutos jugados", min_value=minutos_min_d, max_value=minutos_max_d, value=(minutos_min_d, minutos_max_d))
+        altura_d = st.slider("Altura (cm)", min_value=altura_min_d, max_value=altura_max_d, value=(altura_min_d, altura_max_d))
+        edad_d = st.slider("Edad", min_value=edad_min_d, max_value=edad_max_d, value=(edad_min_d, edad_max_d))
+
+        filter_params_d = {
+            'Minutos jugados': minutos_d,
+            'Altura': altura_d,
+            'Edad': edad_d
+        }
+
+        df_filtered_delanteros = filter_players(df_delanteros, filter_params_d)
+
+        if df_filtered_delanteros.empty:
+            st.warning("No se encontraron delanteros con esos filtros.")
+        else:
+            df_score_delanteros = calculate_score_all_roles_wide(df_filtered_delanteros, roles_metrics_delanteros)
+            st.dataframe(highlight_scores(df_score_delanteros), use_container_width=True)
+
+    else:
+        st.info("Por favor, sube el archivo de delanteros desde la barra lateral.")
+
+# --- Radar Delanteros ---
+with tab10:
+    if uploaded_file_delanteros is not None:
+        df_radar_delanteros = pd.read_excel(uploaded_file_delanteros)
+        df_radar_delanteros = df_radar_delanteros.rename(columns={v: k for k, v in column_map.items()})
+
+        for r in roles_metrics_delanteros.keys():
+            for metric in roles_metrics_delanteros[r]["Metrics"]:
+                if metric in df_radar_delanteros.columns:
+                    norm_col = metric + " Normalized"
+                    df_radar_delanteros[norm_col] = normalize_series(df_radar_delanteros[metric])
+
+        selected_players_delanteros = st.multiselect("Selecciona uno o varios delanteros", df_radar_delanteros["Player"].unique())
+        selected_role_delanteros = st.selectbox("Selecciona un rol para el radar (Delanteros)", list(roles_metrics_delanteros.keys()))
+
+        if selected_players_delanteros:
+            metrics_d = roles_metrics_delanteros[selected_role_delanteros]["Metrics"]
+            labels_d = metrics_d + [metrics_d[0]]  # cerrar círculo
+            fig_d = go.Figure()
+
+            for player_d in selected_players_delanteros:
+                player_radar_row_d = df_radar_delanteros[df_radar_delanteros["Player"] == player_d]
+                if not player_radar_row_d.empty:
+                    player_radar_row_d = player_radar_row_d.iloc[0]
+                    values_d = []
+                    for metric in metrics_d:
+                        norm_col = metric + " Normalized"
+                        values_d.append(player_radar_row_d[norm_col] if norm_col in player_radar_row_d else 0)
+                    values_d += [values_d[0]]  # cerrar círculo
+
+                    fig_d.add_trace(go.Scatterpolar(
+                        r=values_d,
+                        theta=labels_d,
+                        fill='toself',
+                        name=player_d
+                    ))
+
+            fig_d.update_layout(
+                polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
+                title=f"Radar de delanteros - Rol: {selected_role_delanteros}",
+                legend_title_text="Jugadores"
+            )
+            st.plotly_chart(fig_d, use_container_width=True)
+        else:
+            st.info("Selecciona al menos un delantero para visualizar el radar.")
+    else:
+        st.info("Por favor, sube el archivo de delanteros desde la barra lateral para usar el radar.")
 
