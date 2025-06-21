@@ -210,15 +210,14 @@ uploaded_file_mid = st.sidebar.file_uploader("Sube archivo mediocampistas", type
 uploaded_file_cbs = st.sidebar.file_uploader("Sube archivo defensas centrales", type=["xlsx"], key="cbs")
 uploaded_file_wingers = st.sidebar.file_uploader("Sube archivo extremos", type=["xlsx"], key="wingers")
 uploaded_file_laterales = st.sidebar.file_uploader("Sube archivo laterales", type=["xlsx"], key="laterales")
-uploaded_file_delanteros = st.sidebar.file_uploader("Sube archivo laterales", type=["xlsx"], key="delanteros")
+uploaded_file_delanteros = st.sidebar.file_uploader("Sube archivo de delanteros", type=["xlsx"], key="delanteros")
+
 
 
 tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10 = st.tabs([
-    "Mediocampistas", "Radar Mediocampistas",
-    "Defensas Centrales", "Radar Defensas Centrales",
-    "Extremos", "Radar Extremos",
-    "Laterales", "Radar Laterales", "Delatneros", "Radar Delanteros"
+    "Tab1", "Tab2", "Tab3", "Tab4", "Extremos", "Radar Extremos", "Laterales", "Radar Laterales", "Delanteros", "Radar Delanteros"
 ])
+
 
 
 with tab1:
