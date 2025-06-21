@@ -215,7 +215,7 @@ uploaded_file_delanteros = st.sidebar.file_uploader("Sube archivo de delanteros"
 
 
 tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10 = st.tabs([
-    "Tab1", "Tab2", "Tab3", "Tab4", "Extremos", "Radar Extremos", "Laterales", "Radar Laterales", "Delanteros", "Radar Delanteros"
+    "Mediocampistas", "Radar Mediocampistas", "Centrales", "Radar Centrales", "Extremos", "Radar Extremos", "Laterales", "Radar Laterales", "Delanteros", "Radar Delanteros"
 ])
 
 
