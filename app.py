@@ -79,6 +79,21 @@ roles_metrics_wingers = {
     }
 }
 
+roles_metrics_laterales = {
+    "Attacking FB": {
+        "Metrics": ["Passes to penalty area per 90", "Passes to final third per 90", "Progressive runs per 90", "Offensive duels won, %",
+                    "Successful dribbles, %", "xA per 90", "Accelerations per 90", "Accurate crosses, %"],
+        "Weights": [0.075, 0.075, 0.05, 0.325, 0.15, 0.1, 0.05, 0.1]
+    },
+    "Inverted FB": {
+        "Metrics": ["Passes per 90", "Smart passes per 90", "Through passes per 90", "Progressive passes per 90",
+                    "PAdj Sliding tackles", "PAdj Interceptions", "Short / medium passes per 90", "Defensive duels won, %"],
+        "Weights": [0.35, 0.075, 0.1, 0.2, 0.05, 0.05, 0.125, 0.05]
+    },
+    "Defensive FB": {
+        "Metrics": ["Defensive duels won, %", "Aerial duels won, %", "PAdj Sliding tackles", "PAdj Interceptions"],
+        "Weights": [0.55, 0.15, 0.15, 0.15]
+    }
 
 # --- Diccionario con nombres, descripción y número típico de posición ---
 role_descriptions = {
@@ -168,9 +183,16 @@ st.sidebar.header("Carga de datos")
 uploaded_file_mid = st.sidebar.file_uploader("Sube archivo mediocampistas", type=["xlsx"], key="mid")
 uploaded_file_cbs = st.sidebar.file_uploader("Sube archivo defensas centrales", type=["xlsx"], key="cbs")
 uploaded_file_wingers = st.sidebar.file_uploader("Sube archivo extremos", type=["xlsx"], key="wingers")
+uploaded_file_laterales = st.sidebar.file_uploader("Sube archivo laterales", type=["xlsx"], key="laterales")
 
 
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Mediocampistas", "Radar Mediocampistas", "Defensas Centrales", "Radar Defensas Centrales", "Extremos", "Radar Extremos"])
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
+    "Mediocampistas", "Radar Mediocampistas",
+    "Defensas Centrales", "Radar Defensas Centrales",
+    "Extremos", "Radar Extremos",
+    "Laterales", "Radar Laterales"
+])
+
 
 with tab1:
     if uploaded_file_mid is not None:
@@ -417,4 +439,84 @@ with tab6:
             st.info("Selecciona al menos un extremo para visualizar el radar.")
     else:
         st.info("Por favor, sube el archivo de extremos desde la barra lateral para usar el radar.")
+
+
+with tab7:
+    uploaded_file_laterales = st.sidebar.file_uploader("Sube archivo laterales", type=["xlsx"], key="laterales")
+    if uploaded_file_laterales is not None:
+        df_laterales = pd.read_excel(uploaded_file_laterales)
+        df_laterales = df_laterales.rename(columns={v: k for k, v in column_map.items()})
+
+        minutos_min_l, minutos_max_l = int(df_laterales['Minutos jugados'].min()), int(df_laterales['Minutos jugados'].max())
+        altura_min_l, altura_max_l = max(0, int(df_laterales['Altura'].min())), int(df_laterales['Altura'].max())
+        edad_min_l, edad_max_l = int(df_laterales['Edad'].min()), int(df_laterales['Edad'].max())
+
+        st.header("Filtrar y visualizar tabla - Laterales")
+        minutos_l = st.slider("Minutos jugados", min_value=minutos_min_l, max_value=minutos_max_l, value=(minutos_min_l, minutos_max_l))
+        altura_l = st.slider("Altura (cm)", min_value=altura_min_l, max_value=altura_max_l, value=(altura_min_l, altura_max_l))
+        edad_l = st.slider("Edad", min_value=edad_min_l, max_value=edad_max_l, value=(edad_min_l, edad_max_l))
+
+        filter_params_l = {
+            'Minutos jugados': minutos_l,
+            'Altura': altura_l,
+            'Edad': edad_l
+        }
+
+        df_filtered_laterales = filter_players(df_laterales, filter_params_l)
+
+        if df_filtered_laterales.empty:
+            st.warning("No se encontraron laterales con esos filtros.")
+        else:
+            df_score_laterales = calculate_score_all_roles_wide(df_filtered_laterales, roles_metrics_laterales)
+            st.dataframe(highlight_scores(df_score_laterales), use_container_width=True)
+    else:
+        st.info("Por favor, sube el archivo de laterales desde la barra lateral.")
+
+with tab8:
+    if 'uploaded_file_laterales' in locals() and uploaded_file_laterales is not None:
+        df_radar_laterales = pd.read_excel(uploaded_file_laterales)
+        df_radar_laterales = df_radar_laterales.rename(columns={v: k for k, v in column_map.items()})
+
+        for r in roles_metrics_laterales.keys():
+            for metric in roles_metrics_laterales[r]["Metrics"]:
+                if metric in df_radar_laterales.columns:
+                    norm_col = metric + " Normalized"
+                    df_radar_laterales[norm_col] = normalize_series(df_radar_laterales[metric])
+
+        selected_players_l = st.multiselect("Selecciona uno o varios laterales", df_radar_laterales["Player"].unique())
+        selected_role_l = st.selectbox("Selecciona un rol para el radar (Laterales)", list(roles_metrics_laterales.keys()))
+
+        if selected_players_l:
+            metrics_l = roles_metrics_laterales[selected_role_l]["Metrics"]
+            labels_l = metrics_l + [metrics_l[0]]  # cerrar círculo
+            fig_l = go.Figure()
+
+            for player_l in selected_players_l:
+                player_radar_row_l = df_radar_laterales[df_radar_laterales["Player"] == player_l]
+                if not player_radar_row_l.empty:
+                    player_radar_row_l = player_radar_row_l.iloc[0]
+                    values_l = []
+                    for metric in metrics_l:
+                        norm_col = metric + " Normalized"
+                        values_l.append(player_radar_row_l[norm_col] if norm_col in player_radar_row_l else 0)
+                    values_l += [values_l[0]]  # cerrar círculo
+
+                    fig_l.add_trace(go.Scatterpolar(
+                        r=values_l,
+                        theta=labels_l,
+                        fill='toself',
+                        name=player_l
+                    ))
+
+            fig_l.update_layout(
+                polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
+                title=f"Radar de laterales - Rol: {selected_role_l}",
+                legend_title_text="Jugadores"
+            )
+            st.plotly_chart(fig_l, use_container_width=True)
+        else:
+            st.info("Selecciona al menos un lateral para visualizar el radar.")
+    else:
+        st.info("Por favor, sube el archivo de laterales desde la barra lateral para usar el radar.")
+
 
