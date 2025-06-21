@@ -441,8 +441,8 @@ with tab6:
         st.info("Por favor, sube el archivo de extremos desde la barra lateral para usar el radar.")
 
 
+# --- Laterales ---
 with tab7:
-    uploaded_file_laterales = st.sidebar.file_uploader("Sube archivo laterales", type=["xlsx"], key="laterales")
     if uploaded_file_laterales is not None:
         df_laterales = pd.read_excel(uploaded_file_laterales)
         df_laterales = df_laterales.rename(columns={v: k for k, v in column_map.items()})
@@ -469,11 +469,14 @@ with tab7:
         else:
             df_score_laterales = calculate_score_all_roles_wide(df_filtered_laterales, roles_metrics_laterales)
             st.dataframe(highlight_scores(df_score_laterales), use_container_width=True)
+
     else:
         st.info("Por favor, sube el archivo de laterales desde la barra lateral.")
 
+
+# --- Radar Laterales ---
 with tab8:
-    if 'uploaded_file_laterales' in locals() and uploaded_file_laterales is not None:
+    if uploaded_file_laterales is not None:
         df_radar_laterales = pd.read_excel(uploaded_file_laterales)
         df_radar_laterales = df_radar_laterales.rename(columns={v: k for k, v in column_map.items()})
 
@@ -483,15 +486,15 @@ with tab8:
                     norm_col = metric + " Normalized"
                     df_radar_laterales[norm_col] = normalize_series(df_radar_laterales[metric])
 
-        selected_players_l = st.multiselect("Selecciona uno o varios laterales", df_radar_laterales["Player"].unique())
-        selected_role_l = st.selectbox("Selecciona un rol para el radar (Laterales)", list(roles_metrics_laterales.keys()))
+        selected_players_laterales = st.multiselect("Selecciona uno o varios laterales", df_radar_laterales["Player"].unique())
+        selected_role_laterales = st.selectbox("Selecciona un rol para el radar (Laterales)", list(roles_metrics_laterales.keys()))
 
-        if selected_players_l:
-            metrics_l = roles_metrics_laterales[selected_role_l]["Metrics"]
+        if selected_players_laterales:
+            metrics_l = roles_metrics_laterales[selected_role_laterales]["Metrics"]
             labels_l = metrics_l + [metrics_l[0]]  # cerrar círculo
             fig_l = go.Figure()
 
-            for player_l in selected_players_l:
+            for player_l in selected_players_laterales:
                 player_radar_row_l = df_radar_laterales[df_radar_laterales["Player"] == player_l]
                 if not player_radar_row_l.empty:
                     player_radar_row_l = player_radar_row_l.iloc[0]
@@ -510,7 +513,7 @@ with tab8:
 
             fig_l.update_layout(
                 polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
-                title=f"Radar de laterales - Rol: {selected_role_l}",
+                title=f"Radar de laterales - Rol: {selected_role_laterales}",
                 legend_title_text="Jugadores"
             )
             st.plotly_chart(fig_l, use_container_width=True)
