@@ -363,7 +363,7 @@ with tab5:
         if df_filtered_wingers.empty:
             st.warning("No se encontraron extremos con esos filtros.")
         else:
-            df_score_wingers = calculate_score_all_roles_wide(df_filtered_wingers, roles_metrics)
+            df_score_wingers = calculate_score_all_roles_wide(df_filtered_wingers, roles_metrics_wingers)
             st.dataframe(highlight_scores(df_score_wingers), use_container_width=True)
 
     else:
