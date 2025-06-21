@@ -376,17 +376,17 @@ with tab6:
         df_radar_wingers = pd.read_excel(uploaded_file_wingers)
         df_radar_wingers = df_radar_wingers.rename(columns={v: k for k, v in column_map.items()})
 
-        for r in roles_metrics.keys():
-            for metric in roles_metrics[r]["Metrics"]:
+        for r in roles_metrics_wingers.keys():
+            for metric in roles_metrics_wingers[r]["Metrics"]:
                 if metric in df_radar_wingers.columns:
                     norm_col = metric + " Normalized"
                     df_radar_wingers[norm_col] = normalize_series(df_radar_wingers[metric])
 
         selected_players_wingers = st.multiselect("Selecciona uno o varios extremos", df_radar_wingers["Player"].unique())
-        selected_role_wingers = st.selectbox("Selecciona un rol para el radar (Extremos)", list(roles_metrics.keys()))
+        selected_role_wingers = st.selectbox("Selecciona un rol para el radar (Extremos)", list(roles_metrics_wingers.keys()))
 
         if selected_players_wingers:
-            metrics_w = roles_metrics[selected_role_wingers]["Metrics"]
+            metrics_w = roles_metrics_wingers[selected_role_wingers]["Metrics"]
             labels_w = metrics_w + [metrics_w[0]]  # cerrar círculo
             fig_w = go.Figure()
 
