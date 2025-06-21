@@ -116,26 +116,6 @@ role_descriptions = {
         "Nombre": "Mediocentro Defensivo",
         "Descripción": "Recuperador puro. Interrumpe el juego rival y protege la zona delante de la defensa.",
         "Posición": "6"
-    }.
-     "Inverted Winger": {
-        "Nombre": "Extremo Invertido",
-        "Descripción": "Busca internarse desde la banda hacia zonas interiores para disparar o combinar.",
-        "Posición": "RW / LW"
-    },
-    "Traditional Winger": {
-        "Nombre": "Extremo Clásico",
-        "Descripción": "Busca desbordar y centrar desde la línea de banda. Mucho uno contra uno.",
-        "Posición": "RW / LW"
-    },
-    "Playmaking Winger": {
-        "Nombre": "Extremo Creativo",
-        "Descripción": "Participa en la construcción del juego y generación de ocasiones desde banda.",
-        "Posición": "RW / LW"
-    },
-    "Inside Forward": {
-        "Nombre": "Delantero Interior",
-        "Descripción": "Amenaza constante de gol desde banda hacia dentro. Finalizador más que asistente.",
-        "Posición": "RW / LW"
     }
 }
 
