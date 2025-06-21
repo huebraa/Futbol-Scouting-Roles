@@ -337,31 +337,46 @@ with tab4:
     else:
         st.info("Por favor, sube el archivo de defensas centrales desde la barra lateral para usar el radar.")
 
+# --- Extremos (tab1) ---
 with tab5:
     if uploaded_file_wingers is not None:
         df_wingers = pd.read_excel(uploaded_file_wingers)
+        df_wingers = df_wingers.rename(columns={v: k for k, v in column_map.items()})
 
-        selected_role_winger = st.selectbox("Selecciona un rol de extremo", list(roles_metrics_wingers.keys()), key="role_wingers")
+        # Filtramos variables base
+        minutos_min, minutos_max = int(df_wingers['Minutos jugados'].min()), int(df_wingers['Minutos jugados'].max())
+        edad_min, edad_max = int(df_wingers['Edad'].min()), int(df_wingers['Edad'].max())
+        altura_min, altura_max = max(0, int(df_wingers['Altura'].min())), int(df_wingers['Altura'].max())
 
-        role_metrics = roles_metrics_wingers[selected_role_winger]["Metrics"]
-        role_weights = roles_metrics_wingers[selected_role_winger]["Weights"]
+        st.header("Filtrar y visualizar tabla - Extremos")
 
-        df_filtered_wingers = df_wingers[df_wingers[role_metrics].notna().all(axis=1)].copy()
+        minutos_w = st.slider("Minutos jugados", min_value=minutos_min, max_value=minutos_max, value=(minutos_min, minutos_max))
+        edad_w = st.slider("Edad", min_value=edad_min, max_value=edad_max, value=(edad_min, edad_max))
+        altura_w = st.slider("Altura (cm)", min_value=altura_min, max_value=altura_max, value=(altura_min, altura_max))
 
-        for metric in role_metrics:
-            min_val = df_filtered_wingers[metric].min()
-            max_val = df_filtered_wingers[metric].max()
-            df_filtered_wingers[metric + " (normalized)"] = df_filtered_wingers[metric].apply(
-                lambda x: 100 * (x - min_val) / (max_val - min_val) if max_val != min_val else 0)
+        filter_params_w = {
+            'Minutos jugados': minutos_w,
+            'Edad': edad_w,
+            'Altura': altura_w
+        }
 
-        normalized_metrics = [metric + " (normalized)" for metric in role_metrics]
+        df_filtered_wingers = filter_players(df_wingers, filter_params_w)
 
-        df_filtered_wingers["Puntaje Rol"] = df_filtered_wingers[normalized_metrics].dot(role_weights)
+        if df_filtered_wingers.empty:
+            st.warning("No se encontraron extremos con esos filtros.")
+        else:
+            df_score_wingers = calculate_score_all_roles_wide(df_filtered_wingers, roles_metrics)
 
-        df_score_wingers = df_filtered_wingers[["Nombre", "Equipo", "Edad", "Puntaje Rol"] + role_metrics].sort_values(
-            by="Puntaje Rol", ascending=False)
+            # Validar que las columnas necesarias existan antes de mostrar
+            cols_to_display = ["Nombre", "Equipo", "Edad", "Puntaje Rol"]
+            if all(col in df_score_wingers.columns for col in cols_to_display):
+                st.dataframe(highlight_scores(df_score_wingers[cols_to_display + list(roles_metrics.keys())]), use_container_width=True)
+            else:
+                st.error("Faltan columnas esenciales como 'Nombre', 'Equipo', 'Edad' o 'Puntaje Rol'. Revisa que el archivo tenga todos los datos requeridos.")
 
-        st.dataframe(df_score_wingers, use_container_width=True)
+    else:
+        st.info("Por favor, sube el archivo de extremos desde la barra lateral.")
+
 
 with tab6:
     if uploaded_file_wingers is not None:
