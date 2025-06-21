@@ -60,6 +60,26 @@ roles_metrics_cbs = {
     }
 }
 
+roles_metrics_wingers = {
+    "Inverted Winger": {
+        "Metrics": ["Shots per 90", "xG per 90", "Touches in box per 90", "Successful dribbles, %", "Shot assists per 90", "Deep completed crosses per 90", "Accurate short / medium passes, %" ],
+        "Weights": [0.3, 0.15, 0.15, 0.15, 0.1, 0.1, 0.05]
+    },
+    "Traditional Winger": {
+        "Metrics": ["Shot assists per 90", "Successful dribbles, %", "Deep completed crosses per 90", "Accelerations per 90", "xA" , "Accurate crosses, %"],
+        "Weights": [0.2, 0.175, 0.225, 0.2, 0.1, 0.1]
+    },
+    "Playmaking Winger": {
+        "Metrics": ["Key passes per 90", "Shot assists per 90","Passes to final third per 90", "Deep completions per 90", "Progressive passes per 90", "Smart passes per 90", "Second assists per 90", "Third assists per 90"],
+        "Weights": [0.25, 0.1, 0.1, 0.1, 0.15, 0.2, 0.05, 0.05]
+    },
+    "Inside Forward": {
+        "Metrics": ["Touches in box per 90", "xG per 90", "Progressive runs per 90", "Goals per 90","Successful dribbles, %", "Goal conversion, %", "xA"],
+        "Weights": [0.2, 0.2, 0.1, 0.15, 0.1, 0.1, 0.15]
+    }
+}
+
+
 # --- Diccionario con nombres, descripción y número típico de posición ---
 role_descriptions = {
     "Box Crashers": {
@@ -96,6 +116,26 @@ role_descriptions = {
         "Nombre": "Mediocentro Defensivo",
         "Descripción": "Recuperador puro. Interrumpe el juego rival y protege la zona delante de la defensa.",
         "Posición": "6"
+    }.
+     "Inverted Winger": {
+        "Nombre": "Extremo Invertido",
+        "Descripción": "Busca internarse desde la banda hacia zonas interiores para disparar o combinar.",
+        "Posición": "RW / LW"
+    },
+    "Traditional Winger": {
+        "Nombre": "Extremo Clásico",
+        "Descripción": "Busca desbordar y centrar desde la línea de banda. Mucho uno contra uno.",
+        "Posición": "RW / LW"
+    },
+    "Playmaking Winger": {
+        "Nombre": "Extremo Creativo",
+        "Descripción": "Participa en la construcción del juego y generación de ocasiones desde banda.",
+        "Posición": "RW / LW"
+    },
+    "Inside Forward": {
+        "Nombre": "Delantero Interior",
+        "Descripción": "Amenaza constante de gol desde banda hacia dentro. Finalizador más que asistente.",
+        "Posición": "RW / LW"
     }
 }
 
@@ -147,8 +187,10 @@ st.sidebar.header("Carga de datos")
 
 uploaded_file_mid = st.sidebar.file_uploader("Sube archivo mediocampistas", type=["xlsx"], key="mid")
 uploaded_file_cbs = st.sidebar.file_uploader("Sube archivo defensas centrales", type=["xlsx"], key="cbs")
+uploaded_file_wingers = st.sidebar.file_uploader("Sube archivo extremos", type=["xlsx"], key="wingers")
 
-tab1, tab2, tab3, tab4 = st.tabs(["Mediocampistas", "Radar Mediocampistas", "Defensas Centrales", "Radar Defensas Centrales"])
+
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Mediocampistas", "Radar Mediocampistas", "Defensas Centrales", "Radar Defensas Centrales", "Extremos", "Radar Extremos"])
 
 with tab1:
     if uploaded_file_mid is not None:
@@ -314,3 +356,67 @@ with tab4:
             st.info("Selecciona al menos un defensa central para visualizar el radar.")
     else:
         st.info("Por favor, sube el archivo de defensas centrales desde la barra lateral para usar el radar.")
+
+with tab5:
+    if uploaded_file_wingers is not None:
+        df_wingers = pd.read_excel(uploaded_file_wingers)
+
+        selected_role_winger = st.selectbox("Selecciona un rol de extremo", list(roles_metrics_wingers.keys()), key="role_wingers")
+
+        role_metrics = roles_metrics_wingers[selected_role_winger]["Metrics"]
+        role_weights = roles_metrics_wingers[selected_role_winger]["Weights"]
+
+        df_filtered_wingers = df_wingers[df_wingers[role_metrics].notna().all(axis=1)].copy()
+
+        for metric in role_metrics:
+            min_val = df_filtered_wingers[metric].min()
+            max_val = df_filtered_wingers[metric].max()
+            df_filtered_wingers[metric + " (normalized)"] = df_filtered_wingers[metric].apply(
+                lambda x: 100 * (x - min_val) / (max_val - min_val) if max_val != min_val else 0)
+
+        normalized_metrics = [metric + " (normalized)" for metric in role_metrics]
+
+        df_filtered_wingers["Puntaje Rol"] = df_filtered_wingers[normalized_metrics].dot(role_weights)
+
+        df_score_wingers = df_filtered_wingers[["Nombre", "Equipo", "Edad", "Puntaje Rol"] + role_metrics].sort_values(
+            by="Puntaje Rol", ascending=False)
+
+        st.dataframe(df_score_wingers, use_container_width=True)
+
+with tab6:
+    if uploaded_file_wingers is not None:
+        df_wingers = pd.read_excel(uploaded_file_wingers)
+
+        selected_role_winger_radar = st.selectbox("Selecciona un rol para el radar", list(roles_metrics_wingers.keys()), key="role_radar_wingers")
+        role_metrics = roles_metrics_wingers[selected_role_winger_radar]["Metrics"]
+
+        df_filtered_wingers = df_wingers[df_wingers[role_metrics].notna().all(axis=1)].copy()
+
+        for metric in role_metrics:
+            min_val = df_filtered_wingers[metric].min()
+            max_val = df_filtered_wingers[metric].max()
+            df_filtered_wingers[metric + " (normalized)"] = df_filtered_wingers[metric].apply(
+                lambda x: 100 * (x - min_val) / (max_val - min_val) if max_val != min_val else 0)
+
+        players = st.multiselect("Selecciona jugadores para comparar", df_filtered_wingers["Nombre"].unique(), key="players_wingers")
+
+        if players:
+            df_selected = df_filtered_wingers[df_filtered_wingers["Nombre"].isin(players)]
+
+            fig = go.Figure()
+
+            for _, row in df_selected.iterrows():
+                fig.add_trace(go.Scatterpolar(
+                    r=[row[metric + " (normalized)"] for metric in role_metrics],
+                    theta=role_metrics,
+                    fill='toself',
+                    name=row["Nombre"]
+                ))
+
+            fig.update_layout(
+                polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
+                showlegend=True
+            )
+
+            st.plotly_chart(fig, use_container_width=True)
+
