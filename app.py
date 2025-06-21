@@ -94,7 +94,7 @@ roles_metrics_laterales = {
         "Metrics": ["Defensive duels won, %", "Aerial duels won, %", "PAdj Sliding tackles", "PAdj Interceptions"],
         "Weights": [0.55, 0.15, 0.15, 0.15]
     }
-
+}
 # --- Diccionario con nombres, descripción y número típico de posición ---
 role_descriptions = {
     "Box Crashers": {
