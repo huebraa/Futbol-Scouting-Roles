@@ -370,40 +370,51 @@ with tab5:
         st.info("Por favor, sube el archivo de extremos desde la barra lateral.")
 
 
+# --- Radar Extremos ---
 with tab6:
     if uploaded_file_wingers is not None:
-        df_wingers = pd.read_excel(uploaded_file_wingers)
+        df_radar_wingers = pd.read_excel(uploaded_file_wingers)
+        df_radar_wingers = df_radar_wingers.rename(columns={v: k for k, v in column_map.items()})
 
-        selected_role_winger_radar = st.selectbox("Selecciona un rol para el radar", list(roles_metrics_wingers.keys()), key="role_radar_wingers")
-        role_metrics = roles_metrics_wingers[selected_role_winger_radar]["Metrics"]
+        for r in roles_metrics.keys():
+            for metric in roles_metrics[r]["Metrics"]:
+                if metric in df_radar_wingers.columns:
+                    norm_col = metric + " Normalized"
+                    df_radar_wingers[norm_col] = normalize_series(df_radar_wingers[metric])
 
-        df_filtered_wingers = df_wingers[df_wingers[role_metrics].notna().all(axis=1)].copy()
+        selected_players_wingers = st.multiselect("Selecciona uno o varios extremos", df_radar_wingers["Player"].unique())
+        selected_role_wingers = st.selectbox("Selecciona un rol para el radar (Extremos)", list(roles_metrics.keys()))
 
-        for metric in role_metrics:
-            min_val = df_filtered_wingers[metric].min()
-            max_val = df_filtered_wingers[metric].max()
-            df_filtered_wingers[metric + " (normalized)"] = df_filtered_wingers[metric].apply(
-                lambda x: 100 * (x - min_val) / (max_val - min_val) if max_val != min_val else 0)
+        if selected_players_wingers:
+            metrics_w = roles_metrics[selected_role_wingers]["Metrics"]
+            labels_w = metrics_w + [metrics_w[0]]  # cerrar círculo
+            fig_w = go.Figure()
 
-        players = st.multiselect("Selecciona jugadores para comparar", df_filtered_wingers["Nombre"].unique(), key="players_wingers")
+            for player_w in selected_players_wingers:
+                player_radar_row_w = df_radar_wingers[df_radar_wingers["Player"] == player_w]
+                if not player_radar_row_w.empty:
+                    player_radar_row_w = player_radar_row_w.iloc[0]
+                    values_w = []
+                    for metric in metrics_w:
+                        norm_col = metric + " Normalized"
+                        values_w.append(player_radar_row_w[norm_col] if norm_col in player_radar_row_w else 0)
+                    values_w += [values_w[0]]  # cerrar círculo
 
-        if players:
-            df_selected = df_filtered_wingers[df_filtered_wingers["Nombre"].isin(players)]
+                    fig_w.add_trace(go.Scatterpolar(
+                        r=values_w,
+                        theta=labels_w,
+                        fill='toself',
+                        name=player_w
+                    ))
 
-            fig = go.Figure()
-
-            for _, row in df_selected.iterrows():
-                fig.add_trace(go.Scatterpolar(
-                    r=[row[metric + " (normalized)"] for metric in role_metrics],
-                    theta=role_metrics,
-                    fill='toself',
-                    name=row["Nombre"]
-                ))
-
-            fig.update_layout(
+            fig_w.update_layout(
                 polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
-                showlegend=True
+                title=f"Radar de extremos - Rol: {selected_role_wingers}",
+                legend_title_text="Jugadores"
             )
-
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig_w, use_container_width=True)
+        else:
+            st.info("Selecciona al menos un extremo para visualizar el radar.")
+    else:
+        st.info("Por favor, sube el archivo de extremos desde la barra lateral para usar el radar.")
 
